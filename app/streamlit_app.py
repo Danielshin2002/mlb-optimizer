@@ -62,6 +62,45 @@ st.set_page_config(
 R2_BASE_URL = os.environ.get("R2_BASE_URL", "").strip().rstrip("/")
 _R2_MODE    = bool(R2_BASE_URL)
 
+try:
+    import requests as _requests
+    _requests_available = True
+except ImportError:
+    _requests_available = False
+
+import io as _io
+
+
+def _read_csv(path: str, **kwargs) -> pd.DataFrame:
+    """Read a CSV from a local path or an R2 URL.
+
+    Uses ``requests`` for HTTP(S) URLs to avoid urllib 403 blocks from
+    Cloudflare, then hands the bytes to ``pd.read_csv``.
+    """
+    if path.startswith("http") and _requests_available:
+        resp = _requests.get(path, timeout=30)
+        resp.raise_for_status()
+        return pd.read_csv(_io.BytesIO(resp.content), **kwargs)
+    return pd.read_csv(path, **kwargs)
+
+
+def _read_excel(path: str, **kwargs) -> pd.DataFrame:
+    """Read an Excel file from a local path or an R2 URL."""
+    if path.startswith("http") and _requests_available:
+        resp = _requests.get(path, timeout=30)
+        resp.raise_for_status()
+        return pd.read_excel(_io.BytesIO(resp.content), **kwargs)
+    return pd.read_excel(path, **kwargs)
+
+
+def _r2_image(path: str) -> bytes | str:
+    """Return image bytes (for R2 URLs) or a local path for st.image()."""
+    if path.startswith("http") and _requests_available:
+        resp = _requests.get(path, timeout=30)
+        resp.raise_for_status()
+        return resp.content
+    return path
+
 
 def _data_url(relative_path: str) -> str:
     """Return an R2 public URL (production) or an absolute local path (development).
@@ -434,7 +473,7 @@ def _cached_projections(salary_path: str, file_hash: str, proj_weights_json: str
         "min_war_threshold":   min_war,
         "max_contract_years":  max_yrs,
     }
-    raw_df = pd.read_csv(salary_path, low_memory=False)
+    raw_df = _read_csv(salary_path, low_memory=False)
     return make_projections(raw_df, cfg), raw_df
 
 
@@ -453,7 +492,7 @@ def _cached_archetypes(proj_hash: str, proj_json: str):
 def _cached_wins(wins_path: str, file_hash: str):
     if not os.path.exists(wins_path):
         return pd.DataFrame()
-    return pd.read_csv(wins_path, low_memory=False)
+    return _read_csv(wins_path, low_memory=False)
 
 
 @st.cache_data(show_spinner="Loading team payroll history ...")
@@ -475,7 +514,7 @@ def _cached_team_scenario(
 ):
     import json as _json
     base_roster_slots = _json.loads(roster_slots_json)
-    combined_df = pd.read_csv(
+    combined_df = _read_csv(
         os.path.join(data_dir, "mlb_combined_2021_2025.csv"),
         low_memory=False,
     )
@@ -495,7 +534,7 @@ def _cached_team_scenario(
 @st.cache_data(show_spinner="Loading player database ...")
 def _cached_simulator_data(combined_path: str, ind_2025_path: str, file_hash: str) -> pd.DataFrame:
     """Load and merge 2025 combined data with 2025 individual contract columns."""
-    comb = pd.read_csv(combined_path, low_memory=False)
+    comb = _read_csv(combined_path, low_memory=False)
     comb.columns = [c.strip() for c in comb.columns]
     comb["Year"] = pd.to_numeric(comb["Year"], errors="coerce")
     comb2025 = comb[comb["Year"] == 2025].copy()
@@ -510,7 +549,7 @@ def _cached_simulator_data(combined_path: str, ind_2025_path: str, file_hash: st
 
     # Enrich with contract year columns from individual file
     if ind_2025_path.startswith("http") or os.path.exists(ind_2025_path):
-        ind = pd.read_csv(ind_2025_path, low_memory=False)
+        ind = _read_csv(ind_2025_path, low_memory=False)
         ind.columns = [c.strip() for c in ind.columns]
         year_cols  = [c for c in ["2026", "2027", "2028", "2029", "2030", "2031"] if c in ind.columns]
         extra_cols = ["Player", "Contract"] + year_cols
@@ -649,7 +688,12 @@ def _cached_2026_payroll(payroll_dir: str, combined_path: str, dir_hash: str) ->
         team_name = fname.replace("-Payroll-2026.xlsx", "")
         team_abbr = _PAYROLL_2026_TEAM_MAP.get(team_name, team_name[:3].upper())
         try:
-            xl = pd.ExcelFile(fpath)
+            if fpath.startswith("http") and _requests_available:
+                _xr = _requests.get(fpath, timeout=30)
+                _xr.raise_for_status()
+                xl = pd.ExcelFile(_io.BytesIO(_xr.content))
+            else:
+                xl = pd.ExcelFile(fpath)
         except Exception:
             continue
 
@@ -708,7 +752,7 @@ def _cached_2026_payroll(payroll_dir: str, combined_path: str, dir_hash: str) ->
     # Also keep full multi-year data for WAR history lookup in PPR
     _war_hist_26: dict = {}
     if combined_path.startswith("http") or os.path.exists(combined_path):
-        comb = pd.read_csv(combined_path, low_memory=False)
+        comb = _read_csv(combined_path, low_memory=False)
         comb.columns = [c.strip() for c in comb.columns]
         comb["Year"] = pd.to_numeric(comb["Year"], errors="coerce")
         # Build WAR history lookup: {player: {year: war}}
@@ -784,7 +828,7 @@ def _cached_2026_payroll(payroll_dir: str, combined_path: str, dir_hash: str) ->
 @st.cache_data(show_spinner=False)
 def _cached_player_history(combined_path: str, file_hash: str) -> pd.DataFrame:
     """Load full multi-year player data for player cards (all years, all players)."""
-    df = pd.read_csv(combined_path, low_memory=False)
+    df = _read_csv(combined_path, low_memory=False)
     df.columns = [c.strip() for c in df.columns]
     df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
     return df
@@ -793,7 +837,7 @@ def _cached_player_history(combined_path: str, file_hash: str) -> pd.DataFrame:
 @st.cache_data(show_spinner=False)
 def _cached_war_reliability(combined_path: str, file_hash: str) -> dict:
     """Compute WAR reliability grades from multi-year history (for consistency badges)."""
-    df = pd.read_csv(combined_path, low_memory=False)
+    df = _read_csv(combined_path, low_memory=False)
     df.columns = [c.strip() for c in df.columns]
     df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
     df["WAR_Total"] = pd.to_numeric(df.get("WAR_Total", pd.Series(dtype=float)), errors="coerce").fillna(0)
@@ -824,7 +868,7 @@ def _cached_razzball(razzball_path: str) -> pd.DataFrame:
     if not razzball_path.startswith("http") and not os.path.exists(razzball_path):
         return pd.DataFrame()
     try:
-        df = pd.read_csv(razzball_path, low_memory=False)
+        df = _read_csv(razzball_path, low_memory=False)
         df.columns = [c.strip() for c in df.columns]
         return df
     except Exception:
@@ -4332,7 +4376,7 @@ def _render_team_planner(base_cfg: dict | None = None):
                 team_cfg["optimizer_mode"] = "archetype"
 
                 team_players     = set(scenario["roster_status_df"]["Player"].tolist())
-                combined_df_full = pd.read_csv(combined_path, low_memory=False)
+                combined_df_full = _read_csv(combined_path, low_memory=False)
                 filtered_raw     = combined_df_full[~combined_df_full["Player"].isin(team_players)].copy()
 
                 with st.spinner("Building projections & running optimizer ..."):
@@ -4597,7 +4641,7 @@ def _render_efficiency_frontier():
         _AL = {"BAL","BOS","CHW","CLE","DET","HOU","KCR","LAA","MIN","NYY","ATH","SEA","TBR","TEX","TOR"}
         _NL = {"ARI","ATL","CHC","CIN","COL","LAD","MIA","MIL","NYM","PHI","PIT","SDP","SFG","STL","WSN"}
         _PITCH = {"SP","RP","TWP","P"}
-        df = pd.read_csv(path, low_memory=False)
+        df = _read_csv(path, low_memory=False)
         df.columns = [c.strip() for c in df.columns]
         df["Salary_M"]  = pd.to_numeric(df.get("Salary", pd.Series(dtype=float)), errors="coerce") / 1_000_000
         df["WAR_Total"] = pd.to_numeric(df.get("WAR_Total", 0), errors="coerce").fillna(0.0)
@@ -5891,7 +5935,7 @@ def _render_league_analysis():
             "teams below are underperforming relative to their spend. "
             "Star = WS champion, diamond = WS runner-up. Faded = missed playoffs."
         )
-        st.image(scatter_path, use_container_width=True)
+        st.image(_r2_image(scatter_path), use_container_width=True)
     else:
         st.info("efficiency_scatter.png not found -- click Regenerate Analysis.")
 
@@ -5905,7 +5949,7 @@ def _render_league_analysis():
     )
     if _R2_MODE or os.path.exists(table_csv):
         try:
-            _rdf = pd.read_csv(table_csv)
+            _rdf = _read_csv(table_csv)
             if "Avg_Gap_M" in _rdf.columns:
                 _team_col = "Abbr" if "Abbr" in _rdf.columns else "Team"
                 _rdf = _rdf.sort_values("Avg_Gap_M").reset_index(drop=True)
@@ -5935,14 +5979,14 @@ def _render_league_analysis():
                 st.plotly_chart(_fig_rank, use_container_width=True,
                                 config={"displayModeBar": False})
             else:
-                st.image(ranking_path, use_container_width=True)
+                st.image(_r2_image(ranking_path), use_container_width=True)
         except Exception:
             if _R2_MODE or os.path.exists(ranking_path):
-                st.image(ranking_path, use_container_width=True)
+                st.image(_r2_image(ranking_path), use_container_width=True)
             else:
                 st.info("efficiency_ranking.png not found — click Regenerate Analysis.")
     elif _R2_MODE or os.path.exists(ranking_path):
-        st.image(ranking_path, use_container_width=True)
+        st.image(_r2_image(ranking_path), use_container_width=True)
     else:
         st.info("efficiency_ranking.png not found — click Regenerate Analysis.")
 
@@ -5954,14 +5998,14 @@ def _render_league_analysis():
             "Top row = 5 most efficient teams (spending least above frontier). "
             "Bottom row = 5 most inefficient. Each bar = average WAR from that position group."
         )
-        st.image(position_path, use_container_width=True)
+        st.image(_r2_image(position_path), use_container_width=True)
     else:
         st.info("position_breakdown.png not found -- click Regenerate Analysis.")
 
     # ── Q3: Playoff Success vs Pay Efficiency — 4-Quadrant ──────────────────
     if _R2_MODE or os.path.exists(table_csv):
         try:
-            _q3 = pd.read_csv(table_csv)
+            _q3 = _read_csv(table_csv)
             if {"Avg_Gap_M", "Avg_Wins", "Playoff_Apps"}.issubset(_q3.columns):
                 st.markdown("---")
                 st.subheader("Playoff Success vs Pay Efficiency — 4-Quadrant View")
@@ -6052,7 +6096,7 @@ def _render_league_analysis():
 
     if _R2_MODE or os.path.exists(table_csv):
         st.subheader("Full AL / NL Ranking Table")
-        rank_df = pd.read_csv(table_csv)
+        rank_df = _read_csv(table_csv)
 
         league_filter = st.radio("League", ["Both", "AL", "NL"], horizontal=True, key="league_filter")
         sort_col = st.selectbox(
@@ -6127,7 +6171,7 @@ def _render_league_analysis():
                 key="dl_ranking",
             )
         if _R2_MODE or os.path.exists(detail_csv):
-            detail_df = pd.read_csv(detail_csv)
+            detail_df = _read_csv(detail_csv)
             with dl2:
                 st.download_button(
                     "Download Year-by-Year Detail (CSV)",
@@ -6141,7 +6185,7 @@ def _render_league_analysis():
         st.subheader("Key Finding: Efficiency vs Winning")
         c1, c2, c3 = st.columns(3)
         if _R2_MODE or os.path.exists(detail_csv):
-            det = pd.read_csv(detail_csv)
+            det = _read_csv(detail_csv)
             from scipy.stats import pearsonr, pointbiserialr
             r_w,  _ = pearsonr(det["dollar_gap_M"], det["Wins"])
             r_po, _ = pointbiserialr(det["dollar_gap_M"], det["in_playoffs"].astype(int))
@@ -6498,8 +6542,8 @@ def _render_rankings_page():
         return
 
     try:
-        detail_df  = pd.read_csv(detail_csv)
-        ranking_df = pd.read_csv(ranking_csv)
+        detail_df  = _read_csv(detail_csv)
+        ranking_df = _read_csv(ranking_csv)
     except Exception as _e:
         st.error(f"Could not load rankings data: {_e}")
         return
