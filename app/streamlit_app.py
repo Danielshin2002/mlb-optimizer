@@ -198,6 +198,20 @@ _RAZZBALL_PATH = _data_url("data/razzball.csv")
 # Helpers
 # ---------------------------------------------------------------------------
 
+
+def _loading_placeholder(message: str = "Loading data ...") -> None:
+    """Render a centered loading card with animated progress bar."""
+    st.markdown(
+        f"<div class='loading-container'>"
+        f"<div class='loading-icon'>⚾</div>"
+        f"<div class='loading-title'>{message}</div>"
+        f"<div class='loading-sub'>This may take a few seconds on first load</div>"
+        f"<div class='loading-bar'></div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
 def _load_base_config(path: str = _DEFAULT_CONFIG) -> dict:
     with open(path) as fh:
         return json.load(fh)
@@ -1070,7 +1084,72 @@ def _render_nav_bar():
   background: #0e1720 !important;
   border-right: 1px solid #1e3250 !important;
 }
-.block-container { padding-top: 1rem !important; }
+/* === ISSUE 1 — Hide Streamlit default toolbar/header/footer === */
+header[data-testid="stHeader"] { display: none !important; }
+#MainMenu { display: none !important; }
+footer { display: none !important; }
+[data-testid="stToolbar"] { display: none !important; }
+[data-testid="stDecoration"] { display: none !important; }
+[data-testid="stStatusWidget"] { display: none !important; }
+.stDeployButton { display: none !important; }
+[data-testid="stAppViewContainer"] { padding-top: 0 !important; }
+
+.block-container {
+  padding-top: 0rem !important;
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+}
+
+/* === ISSUE 3 — Loading state UI === */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  gap: 16px;
+}
+.loading-icon { font-size: 48px; }
+.loading-title {
+  font-size: 1.1rem; font-weight: 700; color: #d6e8f8;
+}
+.loading-sub {
+  font-size: 0.78rem; color: #4a687e;
+}
+.loading-bar {
+  width: 200px; height: 3px;
+  background: #1e3250;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.loading-bar::after {
+  content: '';
+  display: block;
+  height: 100%;
+  width: 40%;
+  background: #4a9eff;
+  border-radius: 2px;
+  animation: loadpulse 1.5s ease-in-out infinite;
+}
+@keyframes loadpulse {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+/* Style Streamlit's native spinner/loading widget */
+[data-testid="stSpinner"] {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 40vh;
+  text-align: center !important;
+}
+[data-testid="stSpinner"] > div {
+  color: #93c5fd !important;
+  font-size: 0.88rem !important;
+}
 
 /* ── Cards / containers ───────────────────────────────────────────── */
 [data-testid="stExpander"] {
@@ -1309,12 +1388,13 @@ button[data-testid="stMultiSelectClearButton"] { display: none !important; }
 [data-baseweb="clear-icon"]  { display: none !important; }
 [aria-label="Clear all"]     { display: none !important; }
 
+/* === MOBILE RESPONSIVE FIXES === */
+
 /* ══════════════════════════════════════════════════════════════════════
    RESPONSIVE — Tablet (≤1024px)
    ══════════════════════════════════════════════════════════════════════ */
 @media (max-width: 1024px) {
   .block-container { padding: 0.5rem 0.8rem !important; }
-  /* Stack 3+ column layouts into 2 columns */
   [data-testid="stHorizontalBlock"] {
     flex-wrap: wrap !important;
     gap: 0.5rem !important;
@@ -1328,37 +1408,57 @@ button[data-testid="stMultiSelectClearButton"] { display: none !important; }
    RESPONSIVE — Mobile (≤768px)
    ══════════════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  /* ── Global spacing ────────────────────────────────────────────── */
+
+  /* ── Issue 5 — Global spacing & padding ────────────────────────── */
   .block-container {
-    padding: 0.3rem 0.5rem !important;
+    padding: 0.3rem 0.75rem !important;
     max-width: 100% !important;
   }
 
-  /* ── Stack ALL st.columns vertically ───────────────────────────── */
+  /* ── Issue 5 — Typography scale-down ───────────────────────────── */
+  h1 { font-size: 1.4rem !important; }
+  h2 { font-size: 1.2rem !important; }
+  h3 { font-size: 1.1rem !important; }
+  h4 { font-size: 0.9rem !important; }
+
+  /* ── Issue 5 — Streamlit columns stack vertically ──────────────── */
   [data-testid="stHorizontalBlock"] {
     flex-direction: column !important;
     gap: 0.4rem !important;
   }
-  [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+  [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"],
+  [data-testid="column"] {
     width: 100% !important;
     flex: 1 1 100% !important;
     min-width: 100% !important;
   }
 
-  /* ── Typography scale-down ─────────────────────────────────────── */
-  h1 { font-size: 1.4rem !important; }
-  h2 { font-size: 1.15rem !important; }
-  h3 { font-size: 1rem !important; }
-  h4 { font-size: 0.9rem !important; }
+  /* ── Issue 5 — Reduce vertical gaps ────────────────────────────── */
+  [data-testid="stVerticalBlock"] > div {
+    gap: 0.5rem !important;
+  }
 
-  /* ── Metrics — compact ─────────────────────────────────────────── */
+  /* ── Issue 5 — Tables scroll horizontally ──────────────────────── */
+  [data-testid="stDataFrame"],
+  [data-testid="stDataEditor"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Issue 5 — Plotly charts fill width ────────────────────────── */
+  .js-plotly-plot { width: 100% !important; }
+  [data-testid="stPlotlyChart"] {
+    min-height: 280px !important;
+  }
+
+  /* ── Issue 5 — Metrics compact ─────────────────────────────────── */
   [data-testid="stMetric"] {
     padding: 0.3rem 0.5rem !important;
   }
   [data-testid="stMetricLabel"] { font-size: 0.62rem !important; }
   [data-testid="stMetricValue"] { font-size: 1rem !important; }
 
-  /* ── Tabs — scrollable ─────────────────────────────────────────── */
+  /* ── Issue 5 — Tabs scrollable ─────────────────────────────────── */
   .stTabs [data-baseweb="tab-list"] {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
@@ -1372,68 +1472,101 @@ button[data-testid="stMultiSelectClearButton"] { display: none !important; }
     flex-shrink: 0 !important;
   }
 
-  /* ── Expanders — compact ───────────────────────────────────────── */
+  /* ── Issue 5 — Expanders compact ───────────────────────────────── */
   [data-testid="stExpander"] summary {
     font-size: 0.78rem !important;
     padding: 0.4rem 0.6rem !important;
   }
 
-  /* ── Dataframes — horizontal scroll ────────────────────────────── */
-  [data-testid="stDataFrame"],
-  [data-testid="stDataEditor"] {
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* ── Plotly charts — minimum height ────────────────────────────── */
-  [data-testid="stPlotlyChart"] {
-    min-height: 280px !important;
-  }
-
-  /* ── Buttons — full width on mobile ────────────────────────────── */
+  /* ── Issue 5 — Buttons full width ──────────────────────────────── */
   [data-testid="stButton"] > button,
   [data-testid="stDownloadButton"] > button {
     width: 100% !important;
     font-size: 0.78rem !important;
   }
 
-  /* ── Sidebar — full-width overlay ──────────────────────────────── */
+  /* ── Issue 5 — Sidebar full-width overlay ──────────────────────── */
   [data-testid="stSidebar"] {
     min-width: 100vw !important;
     max-width: 100vw !important;
   }
 
-  /* ── Select / multiselect — full width ─────────────────────────── */
+  /* ── Issue 5 — Select / multiselect full width ─────────────────── */
   [data-baseweb="select"],
   [data-baseweb="input"] {
     min-width: 0 !important;
   }
 
-  /* ── Nav bar — compact on mobile ───────────────────────────────── */
+  /* ── Issue 2 — Nav bar: scrollable pill row on mobile ──────────── */
   .mlb-nav {
-    justify-content: center !important;
-    gap: 0.2rem !important;
-    padding: 0.3rem 0 !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap !important;
+    gap: 0.25rem !important;
+    padding: 0.3rem 0.5rem !important;
+    position: relative;
+  }
+  .mlb-nav::-webkit-scrollbar { display: none; }
+  .mlb-nav::after {
+    content: '';
+    position: sticky;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    min-width: 32px;
+    flex-shrink: 0;
+    background: linear-gradient(to right, transparent, #111927 85%);
+    pointer-events: none;
+    z-index: 2;
   }
   .mlb-nav a {
-    font-size: 0.75rem !important;
-    padding: 0.3rem 0.5rem !important;
+    font-size: 13px !important;
+    padding: 0.45rem 0.65rem !important;
+    min-height: 44px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    border-radius: 8px !important;
   }
+  /* Hide the separator and subtitle on mobile */
   .mlb-nav > span:nth-child(2),
-  .mlb-nav > span:nth-child(3) {
+  .mlb-nav > span:nth-child(3),
+  .mlb-nav > span:nth-child(4) {
     display: none !important;
   }
+
+  /* ── Issue 6 — Sticky bar safe area ────────────────────────────── */
+  .mlb-sbar {
+    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    z-index: 999 !important;
+    gap: 10px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    font-size: 0.64rem !important;
+  }
+  .mlb-sbar .sb-t { font-size: 12px !important; }
+  .mlb-sbar .sb-v,
+  .mlb-sbar .sb-val { font-size: 11px !important; }
+  .mlb-sbar .sb-l,
+  .mlb-sbar .sb-lbl { font-size: 7px !important; }
+  .mlb-sbar-pad { height: max(44px, calc(44px + env(safe-area-inset-bottom))) !important; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
    RESPONSIVE — Small phone (≤480px)
    ══════════════════════════════════════════════════════════════════════ */
 @media (max-width: 480px) {
-  .block-container { padding: 0.2rem 0.3rem !important; }
+  .block-container { padding: 0.2rem 0.4rem !important; }
   h1 { font-size: 1.2rem !important; }
   h2 { font-size: 1rem !important; }
   h3 { font-size: 0.88rem !important; }
   [data-testid="stMetricValue"] { font-size: 0.88rem !important; }
+  .mlb-sbar { gap: 6px !important; padding-left: 8px !important; padding-right: 8px !important; }
+  .mlb-sbar .sb-t { font-size: 10px !important; }
+  .mlb-sbar .sb-v,
+  .mlb-sbar .sb-val { font-size: 10px !important; }
 }
 </style>""", unsafe_allow_html=True)
 
@@ -2347,25 +2480,39 @@ def _render_home_page():
         .cr-img  { width: 140px; height: 140px; }
     }
 
-    /* ── Home page — Mobile ──────────────────────────────────────── */
+    /* ── Issue 4 — Home page cards mobile layout ────────────────── */
     @media (max-width: 768px) {
-        .home-wrap { min-height: auto; }
+        .home-wrap {
+            min-height: auto;
+            overflow-x: hidden !important;
+        }
         .home-fg {
             min-height: auto;
-            padding: 2rem 0.8rem 1.5rem;
+            padding: 2rem 12px 1.5rem;
             gap: 0.35rem;
         }
         .h-grid {
             grid-template-columns: 1fr;
             gap: 0.7rem;
             max-width: 100%;
-            padding: 0 0.3rem;
+            padding: 0 12px;
+            overflow-x: hidden !important;
         }
-        .h-card { padding: 1rem 0.8rem 0.9rem; border-radius: 10px; }
+        .h-card {
+            padding: 1rem 0.8rem 0.9rem;
+            border-radius: 10px;
+            word-wrap: break-word;
+            overflow: hidden;
+        }
         .h-icon  { font-size: 1.8rem; }
         .h-title { font-size: 0.85rem; }
         .h-desc  { font-size: 0.68rem; }
-        .h-btn   { padding: 0.3rem 1rem; font-size: 0.72rem; }
+        .h-btn   {
+            padding: 0.4rem 1rem;
+            font-size: 0.75rem;
+            width: 100%;
+            text-align: center;
+        }
         .home-title-grad, .home-ball { font-size: 2.2rem; }
         .home-sub { font-size: 0.68rem; letter-spacing: 0.15em; }
         .home-rule { width: 80%; }
@@ -2378,6 +2525,8 @@ def _render_home_page():
         .home-title-grad, .home-ball { font-size: 1.8rem; }
         .home-sub { font-size: 0.6rem; }
         .cr-img { width: 75px; height: 75px; }
+        .home-fg { padding: 1.5rem 8px 1.2rem; }
+        .h-grid { padding: 0 8px; }
     }
     </style>
     """, unsafe_allow_html=True)
