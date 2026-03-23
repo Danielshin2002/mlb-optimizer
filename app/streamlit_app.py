@@ -77,6 +77,32 @@ except ImportError:
     _requests_available = False
 
 import io as _io
+import unicodedata as _unicodedata
+
+
+def _fix_player_name(s: str) -> str:
+    """Normalise a player name: undo double-encoded UTF-8, then strip diacritics.
+
+    Handles mojibake like "JosÃ©" → "Jose" and clean accents like "Pérez" → "Perez".
+    Plain ASCII names pass through unchanged.
+    """
+    if not isinstance(s, str):
+        return s
+    # Step 1: undo double-encoded UTF-8 (latin-1 round-trip)
+    try:
+        s = s.encode("latin-1").decode("utf-8")
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        pass
+    # Step 2: strip combining diacritical marks → ASCII equivalents
+    nfkd = _unicodedata.normalize("NFKD", s)
+    return "".join(c for c in nfkd if not _unicodedata.combining(c))
+
+
+def _fix_player_col(df: pd.DataFrame) -> pd.DataFrame:
+    """If a 'Player' column exists, normalise every name in place."""
+    if "Player" in df.columns:
+        df["Player"] = df["Player"].map(_fix_player_name)
+    return df
 
 
 def _read_csv(path: str, **kwargs) -> pd.DataFrame:
@@ -84,12 +110,13 @@ def _read_csv(path: str, **kwargs) -> pd.DataFrame:
 
     Uses ``requests`` for HTTP(S) URLs to avoid urllib 403 blocks from
     Cloudflare, then hands the bytes to ``pd.read_csv``.
+    Automatically normalises the Player column if present.
     """
     if path.startswith("http") and _requests_available:
         resp = _requests.get(path, timeout=30)
         resp.raise_for_status()
-        return pd.read_csv(_io.BytesIO(resp.content), **kwargs)
-    return pd.read_csv(path, **kwargs)
+        return _fix_player_col(pd.read_csv(_io.BytesIO(resp.content), **kwargs))
+    return _fix_player_col(pd.read_csv(path, **kwargs))
 
 
 def _read_excel(path: str, **kwargs) -> pd.DataFrame:
@@ -97,8 +124,8 @@ def _read_excel(path: str, **kwargs) -> pd.DataFrame:
     if path.startswith("http") and _requests_available:
         resp = _requests.get(path, timeout=30)
         resp.raise_for_status()
-        return pd.read_excel(_io.BytesIO(resp.content), **kwargs)
-    return pd.read_excel(path, **kwargs)
+        return _fix_player_col(pd.read_excel(_io.BytesIO(resp.content), **kwargs))
+    return _fix_player_col(pd.read_excel(path, **kwargs))
 
 
 def _r2_image(path: str) -> bytes | str:
@@ -160,7 +187,10 @@ _ROSTER_TEMPLATE = {
 }
 
 # Player headshots and MLBAM ID lookup (inside the project data folder)
-_HEADSHOTS_DIR = os.path.join(_ROOT_DIR, "data", "headshots")  # local cache dir
+_HEADSHOTS_DIR = (
+    f"{R2_BASE_URL}/data/headshots" if _R2_MODE
+    else os.path.join(_ROOT_DIR, "data", "headshots")
+)
 _RAZZBALL_PATH = _data_url("data/razzball.csv")
 
 # ---------------------------------------------------------------------------

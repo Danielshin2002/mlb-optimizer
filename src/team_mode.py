@@ -23,8 +23,28 @@ from __future__ import annotations
 
 import os
 
+import unicodedata
 import numpy as np
 import pandas as pd
+
+
+def _fix_player_name(s: str) -> str:
+    """Normalise a player name: undo double-encoded UTF-8, then strip diacritics."""
+    if not isinstance(s, str):
+        return s
+    try:
+        s = s.encode("latin-1").decode("utf-8")
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        pass
+    nfkd = unicodedata.normalize("NFKD", s)
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
+
+
+def _fix_player_col(df: pd.DataFrame) -> pd.DataFrame:
+    """If a 'Player' column exists, normalise every name in place."""
+    if "Player" in df.columns:
+        df["Player"] = df["Player"].map(_fix_player_name)
+    return df
 
 # ---------------------------------------------------------------------------
 # Position-group & slot maps (mirrors projections.py)
@@ -152,7 +172,7 @@ def get_team_payroll_history(data_dir: str) -> pd.DataFrame:
         path = os.path.join(data_dir, fname)
         if not os.path.exists(path):
             continue
-        df = pd.read_csv(path, low_memory=False)
+        df = _fix_player_col(pd.read_csv(path, low_memory=False))
         df.columns = [c.strip() for c in df.columns]
         year_col = str(year)
         if year_col not in df.columns:
@@ -207,7 +227,7 @@ def get_team_roster_status(
     """
     # --- Load 2025 individual file (has contract/year columns) ---
     ind_path = os.path.join(data_dir, _YEAR_FILES[_CURRENT_SEASON])
-    ind = pd.read_csv(ind_path, low_memory=False)
+    ind = _fix_player_col(pd.read_csv(ind_path, low_memory=False))
     ind.columns = [c.strip() for c in ind.columns]
     team_ind = ind[ind["Team"] == team].copy()
 
