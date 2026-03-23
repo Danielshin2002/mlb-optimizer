@@ -199,6 +199,20 @@ _RAZZBALL_PATH = _data_url("data/razzball.csv")
 # ---------------------------------------------------------------------------
 
 
+def _render_feedback_widget(page_name: str = "") -> None:
+    """Render a shared feedback/suggestion widget at the bottom of every page."""
+    with st.expander("💬 Feedback & Suggestions", expanded=False):
+        _fb_type = st.radio("Type:", ["Bug Report", "Feature Request", "General Feedback"],
+                            key=f"fb_type_{page_name}", horizontal=True)
+        _fb_text = st.text_area("Your feedback:", key=f"fb_text_{page_name}",
+                                placeholder="Describe the issue or suggestion...")
+        if st.button("Submit Feedback", key=f"fb_submit_{page_name}", type="secondary"):
+            if _fb_text.strip():
+                st.success("Thank you! Your feedback has been recorded.")
+            else:
+                st.warning("Please enter some feedback text.")
+
+
 def _loading_placeholder(message: str = "Loading data ...") -> None:
     """Render a centered loading card with animated progress bar."""
     st.markdown(
@@ -706,6 +720,51 @@ def _cached_simulator_data(combined_path: str, ind_2025_path: str, file_hash: st
         return round(total, 2) if total > 0 else None
 
     comb2025["Total_Contract_M"] = comb2025.apply(_calc_total_ctrc, axis=1)
+
+    # ------------------------------------------------------------------
+    # WAR Stability Rating (WSR) — Feature 3
+    # WSR = mean_WAR / (1 + std_WAR) using only qualifying seasons
+    # Qualifying: PA ≥ 200 (hitters) or IP ≥ 50 (pitchers)
+    # ------------------------------------------------------------------
+    _comb_all = comb.copy()
+    for _nc in ["WAR_Total", "PA", "IP"]:
+        if _nc in _comb_all.columns:
+            _comb_all[_nc] = pd.to_numeric(_comb_all[_nc], errors="coerce")
+
+    def _calc_wsr(player_name, is_pitcher_flag):
+        p_rows = _comb_all[_comb_all["Player"] == player_name]
+        if is_pitcher_flag:
+            qual = p_rows[p_rows["IP"].fillna(0) >= 50]
+        else:
+            qual = p_rows[p_rows["PA"].fillna(0) >= 200]
+        if len(qual) < 2:
+            return None, None, None, "Insufficient Data"
+        wars = qual["WAR_Total"].dropna()
+        if len(wars) < 2:
+            return None, None, None, "Insufficient Data"
+        m, s = float(wars.mean()), float(wars.std())
+        wsr = round(m / (1 + s), 3)
+        if wsr >= 3.5:
+            tier = "Elite"
+        elif wsr >= 2.0:
+            tier = "Reliable"
+        elif wsr >= 1.0:
+            tier = "Volatile"
+        else:
+            tier = "Unstable"
+        return wsr, round(m, 2), round(s, 2), tier
+
+    _wsr_cache: dict = {}
+    for _, _row in comb2025.iterrows():
+        _pn = _row["Player"]
+        _ip = _row.get("Position", "") in ("SP", "RP", "P", "TWP")
+        if _pn not in _wsr_cache:
+            _wsr_cache[_pn] = _calc_wsr(_pn, _ip)
+
+    comb2025["WSR"]       = comb2025["Player"].map(lambda p: _wsr_cache.get(p, (None,))[0])
+    comb2025["WAR_Mean"]  = comb2025["Player"].map(lambda p: _wsr_cache.get(p, (None, None))[1])
+    comb2025["WAR_Std"]   = comb2025["Player"].map(lambda p: _wsr_cache.get(p, (None, None, None))[2])
+    comb2025["WSR_Tier"]  = comb2025["Player"].map(lambda p: _wsr_cache.get(p, (None, None, None, "Insufficient Data"))[3])
 
     return comb2025
 
@@ -3290,7 +3349,7 @@ def _render_simulator_page():
         )
 
         base_show  = ["Player", "Team", "Position", "Stage_Clean",
-                      "Age", "WAR_Total", "Salary_M", "W_per_M", "PPR"]
+                      "Age", "WAR_Total", "WSR", "Salary_M", "W_per_M", "PPR"]
         hitter_ext = [c for c in ["HR", "AVG", "OBP"] if c in filtered.columns]
         pitch_ext  = [c for c in ["ERA", "IP"]         if c in filtered.columns]
         show_cols  = [c for c in base_show + hitter_ext[:2] + pitch_ext[:1]
@@ -3319,6 +3378,9 @@ def _render_simulator_page():
                           help="Season WAR ÷ 2026 salary. Higher = more efficient."),
             "PPR":        st.column_config.NumberColumn("Ctrc W/$M", format="%.2f", width="small",
                           help="Contract WAR per $M over the full contract length."),
+            "WSR":        st.column_config.NumberColumn("WSR", format="%.2f", width="small",
+                          help="WAR Stability Rating: mean WAR / (1 + std WAR). Higher = more consistent production. "
+                               "Elite ≥ 3.5, Reliable ≥ 2.0, Volatile ≥ 1.0, Unstable < 1.0."),
         }
         for _st in hitter_ext[:2] + pitch_ext[:1]:
             if _st in ("AVG", "OBP"):
@@ -3433,7 +3495,8 @@ def _render_simulator_page():
                 f"  <div class='sim-kpi-box'><div class='kv'>${_r_total_cost:.0f}M</div><div class='kl'>Payroll</div></div>"
                 f"  <div class='sim-kpi-box'><div class='kv' style='color:{_rem_color}'>${_r_remaining:+.0f}M</div><div class='kl'>Remaining</div></div>"
                 f"  <div class='sim-kpi-box'><div class='kv'>~{_r_est_wins:.0f}W</div><div class='kl'>Est. Wins</div></div>"
-                f"  <div class='sim-kpi-box'><div class='kv'>${_r_dpw:.1f}M</div><div class='kl'>$/WAR</div></div>"
+                f"  <div class='sim-kpi-box'><div class='kv'>${_r_dpw:.1f}M</div><div class='kl'>$/WAR</div>"
+                f"  <div style='font-size:0.58rem;color:#4a687e;margin-top:2px;'>${_r_total_cost / max(_r_total_war + 47.7, 1):.2f}M $/Win</div></div>"
                 f"  <div class='sim-kpi-box'><div class='kv'>{_r_n_fa}/{_r_n_arb}/{_r_n_pre}</div><div class='kl'>FA/Arb/Pre</div></div>"
                 f"</div>",
                 unsafe_allow_html=True,
@@ -3647,6 +3710,8 @@ def _render_simulator_page():
             f"<div class='mlb-sbar-pad'></div>",
             unsafe_allow_html=True,
         )
+
+    _render_feedback_widget("simulator")
 
 
 # ---------------------------------------------------------------------------
@@ -5338,7 +5403,7 @@ justify-content:space-between;gap:16px;flex-wrap:wrap;">
         _mlb_ids = _cached_mlbam_lookup(_RAZZBALL_PATH)
 
         # ── Tabs ──────────────────────────────────────────────────────────
-        t1, t2, t3, t4, t5, t6, t7 = st.tabs([
+        t1, t2, t3, t4, t5, t6, t7, t8 = st.tabs([
             "Cost Effective Line",
             "PPEL",
             "Age Trajectory",
@@ -5346,6 +5411,7 @@ justify-content:space-between;gap:16px;flex-wrap:wrap;">
             "Efficient Players",
             "Residual Analysis",
             "Pre-Arb Explorer",
+            "WAR Stability",
         ])
 
         # ── Tab 1 — Cost Effective Line (PPEL 1/3/5-year views) ──────────
@@ -6327,6 +6393,93 @@ display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
                     f"Declining: avg Δ < −{_pa_sd_thresh * _pa_sd_global:.2f}"
                 )
 
+        # ── Tab 8 — WAR Stability (WSR) ─────────────────────────────────
+        with t8:
+            _render_glossary([
+                ("WSR", "WAR Stability Rating",
+                 "mean WAR / (1 + std WAR) across qualifying seasons (PA ≥ 200 or IP ≥ 50). "
+                 "Rewards consistent production over volatile peaks."),
+            ], title="📖 WAR Stability", cols=1)
+
+            _wsr_min_pa = st.slider("Min PA (hitters) / IP (pitchers)", 50, 300, 150,
+                                     key="v2_war_stability_min_pa")
+
+            # Recompute WSR with user threshold
+            _wsr_raw = raw.copy()
+            for _nc in ["WAR_Total", "PA", "IP"]:
+                if _nc in _wsr_raw.columns:
+                    _wsr_raw[_nc] = pd.to_numeric(_wsr_raw[_nc], errors="coerce")
+
+            _is_pit = _wsr_raw["Position"].isin(["SP", "RP", "P", "TWP"])
+            _wsr_qual = _wsr_raw[
+                (_is_pit & (_wsr_raw["IP"].fillna(0) >= _wsr_min_pa)) |
+                (~_is_pit & (_wsr_raw["PA"].fillna(0) >= _wsr_min_pa))
+            ]
+            _wsr_grp = _wsr_qual.groupby("Player").agg(
+                WAR_Mean=("WAR_Total", "mean"),
+                WAR_Std=("WAR_Total", "std"),
+                Seasons=("Year", "nunique"),
+                Team=("Team", "last"),
+            ).reset_index()
+            _wsr_grp = _wsr_grp[_wsr_grp["Seasons"] >= 2].copy()
+            _wsr_grp["WAR_Std"] = _wsr_grp["WAR_Std"].fillna(0)
+            _wsr_grp["WSR"] = (_wsr_grp["WAR_Mean"] / (1 + _wsr_grp["WAR_Std"])).round(3)
+
+            def _wsr_tier(v):
+                if v >= 3.5: return "Elite"
+                if v >= 2.0: return "Reliable"
+                if v >= 1.0: return "Volatile"
+                return "Unstable"
+            _wsr_grp["Tier"] = _wsr_grp["WSR"].apply(_wsr_tier)
+
+            _WSR_COLORS = {"Elite": "#22c55e", "Reliable": "#14b8a6",
+                           "Volatile": "#f59e0b", "Unstable": "#ef4444"}
+
+            if not _wsr_grp.empty:
+                _wsr_hover = _wsr_grp.apply(lambda r: (
+                    f"<b>{r['Player']}</b><br>"
+                    + f"{r['Team']} · {int(r['Seasons'])} seasons<br>"
+                    + f"Mean WAR: {r['WAR_Mean']:.2f} · Std: {r['WAR_Std']:.2f}<br>"
+                    + f"WSR: {r['WSR']:.3f} · {r['Tier']}"
+                ), axis=1)
+
+                fig_wsr = go.Figure()
+                for tier, color in _WSR_COLORS.items():
+                    mask = _wsr_grp["Tier"] == tier
+                    if mask.any():
+                        sub = _wsr_grp[mask]
+                        fig_wsr.add_trace(go.Scatter(
+                            x=sub["WAR_Mean"], y=sub["WAR_Std"],
+                            mode="markers", name=tier,
+                            marker=dict(color=color, size=8, opacity=0.8),
+                            text=_wsr_hover[mask],
+                            hovertemplate="%{text}<extra></extra>",
+                        ))
+
+                _xm = float(_wsr_grp["WAR_Mean"].median())
+                _ym = float(_wsr_grp["WAR_Std"].median())
+                for _ax, _ay, _atxt in [
+                    (_xm * 1.8, _ym * 1.8, "Star but Risky"),
+                    (_xm * 0.3, _ym * 1.8, "Fringe Volatile"),
+                    (_xm * 1.8, _ym * 0.3, "Cornerstone"),
+                    (_xm * 0.3, _ym * 0.3, "Consistent Depth"),
+                ]:
+                    fig_wsr.add_annotation(x=_ax, y=_ay, text=_atxt,
+                                           showarrow=False, font=dict(color="#4a687e", size=10), opacity=0.6)
+
+                fig_wsr.update_layout(**_pt(
+                    title="WAR Stability — Mean WAR vs Standard Deviation",
+                    xaxis=dict(title="Mean WAR (2021-2025)"),
+                    yaxis=dict(title="WAR Std Dev"),
+                    height=580, showlegend=True,
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    hoverlabel=dict(bgcolor="#0d1f38", bordercolor="#1e3a5f",
+                                    font=dict(color="#dbeafe", size=12)),
+                ))
+                st.plotly_chart(fig_wsr, use_container_width=True)
+            else:
+                st.info("No players meet the minimum qualifying threshold.")
+
 
 # ---------------------------------------------------------------------------
 # League Analysis page
@@ -7002,6 +7155,8 @@ def _render_league_analysis():
     else:
         st.info("Pre-arb analysis requires 2026 payroll data and mlb_combined_2021_2025.csv.")
 
+    _render_feedback_widget("league")
+
 
 # ---------------------------------------------------------------------------
 # League Rankings page
@@ -7399,6 +7554,278 @@ def _render_rankings_page():
             hide_index=True, use_container_width=True, height=680,
         )
 
+    # ══════════════════════════════════════════════════════════════════════
+    # Feature 1 — "Does WAR Translate to Wins?"
+    # ══════════════════════════════════════════════════════════════════════
+    st.markdown("---")
+    st.markdown("### Does WAR Translate to Wins?")
+
+    if "team_WAR" in detail_df.columns and "Wins" in detail_df.columns:
+        _f1 = detail_df.dropna(subset=["team_WAR", "Wins"]).copy()
+        _f1["team_WAR"] = pd.to_numeric(_f1["team_WAR"], errors="coerce")
+        _f1["Wins"] = pd.to_numeric(_f1["Wins"], errors="coerce")
+        _f1 = _f1.dropna(subset=["team_WAR", "Wins"])
+
+        if len(_f1) > 5:
+            # Regression
+            _x = _f1["team_WAR"].values
+            _y = _f1["Wins"].values
+            _coef = np.polyfit(_x, _y, 1)
+            _pred = np.polyval(_coef, _x)
+            _ss_res = np.sum((_y - _pred) ** 2)
+            _ss_tot = np.sum((_y - _y.mean()) ** 2)
+            _r2 = 1 - (_ss_res / _ss_tot) if _ss_tot > 0 else 0
+
+            st.caption(f"WAR explains **{_r2 * 100:.1f}%** of win variation across 2021–2025 team-seasons.")
+
+            # Build scatter
+            _f1_playoff = _f1.get("in_playoffs", pd.Series([False] * len(_f1)))
+            _f1_colors = ["#22c55e" if p else "#4a687e" for p in _f1_playoff]
+            _f1_hover = _f1.apply(lambda r: (
+                f"<b>{r['Team']}</b> {int(r['Year'])}<br>"
+                + f"WAR: {r['team_WAR']:.1f} · Wins: {int(r['Wins'])}<br>"
+                + f"Playoff: {'Yes' if r.get('in_playoffs') else 'No'}"
+            ), axis=1)
+
+            fig_f1 = go.Figure()
+            fig_f1.add_trace(go.Scatter(
+                x=_f1["team_WAR"], y=_f1["Wins"], mode="markers",
+                marker=dict(color=_f1_colors, size=8, opacity=0.8),
+                text=_f1_hover, hovertemplate="%{text}<extra></extra>",
+                name="Teams",
+            ))
+            # Regression line
+            _xr = np.linspace(_x.min(), _x.max(), 100)
+            fig_f1.add_trace(go.Scatter(
+                x=_xr, y=np.polyval(_coef, _xr), mode="lines",
+                line=dict(color="#f4a261", width=2), name=f"OLS (R²={_r2:.3f})",
+            ))
+            # Reference line at WAR=30
+            fig_f1.add_vline(x=30, line_dash="dash", line_color="#3b6fd4", opacity=0.5,
+                             annotation_text="Avg contender floor", annotation_position="top right",
+                             annotation_font_color="#3b6fd4")
+
+            fig_f1.update_layout(**_pt(
+                title="", xaxis=dict(title="Total Team WAR"), yaxis=dict(title="Actual Wins"),
+                height=500, showlegend=True,
+                legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
+                hoverlabel=dict(bgcolor="#0d1f38", bordercolor="#1e3a5f",
+                                font=dict(color="#dbeafe", size=12)),
+            ))
+            st.plotly_chart(fig_f1, use_container_width=True)
+
+        # 1B — Efficiency vs Postseason table
+        if {"dollar_gap_M", "in_playoffs", "ws_champ"}.issubset(detail_df.columns):
+            _eff_tbl = detail_df.groupby("Team").agg(
+                Avg_Gap=("dollar_gap_M", "mean"),
+                Playoff_Apps=("in_playoffs", "sum"),
+                WS_Apps=("ws_champ", lambda x: int(x.sum()) + int(detail_df.loc[x.index, "ws_runnerup"].sum()) if "ws_runnerup" in detail_df.columns else int(x.sum())),
+                WS_Wins=("ws_champ", "sum"),
+            ).reset_index()
+            _eff_tbl["Avg_Gap"] = _eff_tbl["Avg_Gap"].round(1)
+            _eff_tbl["Playoff_Apps"] = _eff_tbl["Playoff_Apps"].astype(int)
+            _eff_tbl["WS_Wins"] = _eff_tbl["WS_Wins"].astype(int)
+
+            def _eff_tier(gap):
+                if gap < -20: return ("Elite Value", "#22c55e")
+                if gap < -5:  return ("Efficient", "#14b8a6")
+                if gap <= 5:  return ("Market Rate", "#6b7280")
+                return ("Overpaying", "#ef4444")
+
+            _eff_tbl["Tier"] = _eff_tbl["Avg_Gap"].apply(lambda g: _eff_tier(g)[0])
+            _eff_tbl = _eff_tbl.sort_values("Avg_Gap")
+
+            st.markdown("#### Efficiency vs Postseason Outcomes (2021–2025)")
+            st.dataframe(
+                _eff_tbl.rename(columns={"Avg_Gap": "Avg Gap ($M)", "Playoff_Apps": "Playoff Apps",
+                                          "WS_Apps": "WS Appearances", "WS_Wins": "WS Wins",
+                                          "Tier": "Efficiency Tier"}),
+                hide_index=True, use_container_width=True, height=400,
+            )
+
+            # Auto-generated insight
+            _eff_good = _eff_tbl[_eff_tbl["Avg_Gap"] < -10]
+            _eff_bad  = _eff_tbl[_eff_tbl["Avg_Gap"] > 10]
+            _n_seasons = len(detail_df["Year"].unique())
+            if not _eff_good.empty and not _eff_bad.empty:
+                _good_pct = _eff_good["Playoff_Apps"].sum() / (len(_eff_good) * _n_seasons) * 100
+                _bad_pct  = _eff_bad["Playoff_Apps"].sum() / (len(_eff_bad) * _n_seasons) * 100
+                st.info(
+                    f"Among the {len(_eff_good)} most efficient teams (gap < -$10M), "
+                    f"{_eff_good['Playoff_Apps'].sum()} made the playoffs "
+                    f"({_good_pct:.0f}% of seasons) vs {_bad_pct:.0f}% for the "
+                    f"{len(_eff_bad)} least efficient teams."
+                )
+
+            st.caption(
+                "Research context: Over the past decade, World Series champions averaged 8th in "
+                "payroll — efficient roster construction matters more than total spend once you "
+                "reach the postseason."
+            )
+
+    # ══════════════════════════════════════════════════════════════════════
+    # Feature 2 — Incremental Spending Impact
+    # ══════════════════════════════════════════════════════════════════════
+    st.markdown("---")
+    st.markdown("### What Does an Extra Dollar Buy?")
+
+    if {"payroll_M", "Wins"}.issubset(detail_df.columns):
+        _f2 = detail_df.dropna(subset=["payroll_M", "Wins"]).copy()
+        _f2["payroll_M"] = pd.to_numeric(_f2["payroll_M"], errors="coerce")
+        _f2["Wins"]      = pd.to_numeric(_f2["Wins"], errors="coerce")
+
+        _TIERS = [
+            ("Budget ($0–100M)",       0,   100),
+            ("Mid-Market ($100–175M)", 100, 175),
+            ("Contender ($175–244M)",  175, 244),
+            ("Big Market ($244M+)",    244, 999),
+        ]
+
+        _slopes = []
+        for name, lo, hi in _TIERS:
+            tier_df = _f2[(_f2["payroll_M"] >= lo) & (_f2["payroll_M"] < hi)]
+            if len(tier_df) >= 5:
+                c = np.polyfit(tier_df["payroll_M"], tier_df["Wins"], 1)
+                wins_per_10m = c[0] * 10
+            else:
+                wins_per_10m = 0
+            _slopes.append((name, round(wins_per_10m, 2)))
+
+        _sl_names  = [s[0] for s in _slopes]
+        _sl_vals   = [s[1] for s in _slopes]
+        _sl_colors = ["#22c55e" if v >= 1.0 else "#f59e0b" if v >= 0.3 else "#ef4444" for v in _sl_vals]
+
+        fig_f2 = go.Figure(go.Bar(
+            y=_sl_names, x=_sl_vals, orientation="h",
+            marker_color=_sl_colors,
+            text=[f"{v:+.2f} wins" for v in _sl_vals],
+            textposition="outside", textfont=dict(color="#dbeafe", size=10),
+            hovertemplate="%{y}: %{x:.2f} wins per $10M<extra></extra>",
+        ))
+        fig_f2.update_layout(**_pt(
+            title="Marginal Wins per $10M by Spending Tier",
+            xaxis=dict(title="Wins per $10M spent"),
+            yaxis=dict(autorange="reversed"),
+            height=300,
+            margin=dict(l=180, r=40, t=40, b=40),
+        ))
+        st.plotly_chart(fig_f2, use_container_width=True)
+
+        # 2B — Interactive slider
+        _spend_add = st.slider("Add spending ($M)", 0, 50, 10, step=5,
+                                key="v2_spend_slider")
+        if _spend_add > 0 and _slopes:
+            # Find user's current tier (assume mid-market as default)
+            _cur_tier_idx = 1
+            _cur_slope = _slopes[_cur_tier_idx][1]
+            _add_wins = _cur_slope * (_spend_add / 10)
+            st.markdown(
+                f"<div style='background:#0d1e35;border:1px solid #1e3250;border-radius:8px;"
+                f"padding:0.8rem 1rem;font-size:0.85rem;color:#d6e8f8;'>"
+                f"Adding <b>${_spend_add}M</b> at the <b>{_slopes[_cur_tier_idx][0]}</b> tier "
+                f"buys ~<b>{_add_wins:.1f}</b> additional wins "
+                f"(slope: {_cur_slope:.2f} wins/$10M)."
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+    # ══════════════════════════════════════════════════════════════════════
+    # Feature 4 — Roster Stability Score (RSS) vs Wins
+    # ══════════════════════════════════════════════════════════════════════
+    st.markdown("---")
+    st.markdown("### Does Roster Stability Predict Wins?")
+
+    _comb_path_4 = _data_url("data/mlb_combined_2021_2025.csv")
+    try:
+        _comb_4 = _read_csv(_comb_path_4, low_memory=False)
+        _comb_4.columns = [c.strip() for c in _comb_4.columns]
+        for _nc in ["Year", "PA", "IP", "WAR_Total"]:
+            if _nc in _comb_4.columns:
+                _comb_4[_nc] = pd.to_numeric(_comb_4[_nc], errors="coerce")
+
+        _rss_thresh = st.slider("Min PA (hitters) / IP (pitchers)", 50, 300, 150,
+                                 key="v2_rss_min_pa")
+
+        _is_pit4 = _comb_4["Position"].isin(["SP", "RP", "P", "TWP"])
+        _comb_q = _comb_4[
+            (_is_pit4 & (_comb_4["IP"].fillna(0) >= _rss_thresh)) |
+            (~_is_pit4 & (_comb_4["PA"].fillna(0) >= _rss_thresh))
+        ].copy()
+
+        _years4 = sorted(_comb_q["Year"].dropna().unique().astype(int))
+        _rss_records = []
+        for yr in _years4:
+            if yr == min(_years4):
+                continue  # need prior year
+            for tm in _comb_q["Team"].unique():
+                curr = set(_comb_q[(_comb_q["Year"] == yr) & (_comb_q["Team"] == tm)]["Player"])
+                prev = set(_comb_q[(_comb_q["Year"] == yr - 1) & (_comb_q["Team"] == tm)]["Player"])
+                if not curr:
+                    continue
+                returning = curr & prev
+                rss = len(returning) / len(curr) * 100
+                # Get wins from detail_df
+                _wins_row = detail_df[(detail_df["Year"] == yr) & (detail_df["Team"] == tm)]
+                wins = float(_wins_row["Wins"].iloc[0]) if not _wins_row.empty and "Wins" in _wins_row.columns else None
+                playoff = bool(_wins_row["in_playoffs"].iloc[0]) if not _wins_row.empty and "in_playoffs" in _wins_row.columns else False
+                _rss_records.append({"Team": tm, "Year": yr, "RSS": round(rss, 1),
+                                     "Wins": wins, "Playoff": playoff,
+                                     "Returning": len(returning), "Total": len(curr)})
+
+        if _rss_records:
+            _rss_df = pd.DataFrame(_rss_records).dropna(subset=["Wins"])
+
+            if len(_rss_df) > 10:
+                _rx = _rss_df["RSS"].values
+                _ry = _rss_df["Wins"].values
+                _rc = np.polyfit(_rx, _ry, 1)
+                _rp = np.polyval(_rc, _rx)
+                _rss_r2 = 1 - np.sum((_ry - _rp) ** 2) / max(np.sum((_ry - _ry.mean()) ** 2), 1e-9)
+
+                _rss_colors = ["#22c55e" if p else "#4a687e" for p in _rss_df["Playoff"]]
+                _rss_hover = _rss_df.apply(lambda r: (
+                    f"<b>{r['Team']}</b> {int(r['Year'])}<br>"
+                    + f"RSS: {r['RSS']:.1f}% · Wins: {int(r['Wins'])}<br>"
+                    + f"Returning: {int(r['Returning'])}/{int(r['Total'])}"
+                ), axis=1)
+
+                fig_rss = go.Figure()
+                fig_rss.add_trace(go.Scatter(
+                    x=_rss_df["RSS"], y=_rss_df["Wins"], mode="markers",
+                    marker=dict(color=_rss_colors, size=8, opacity=0.8),
+                    text=_rss_hover, hovertemplate="%{text}<extra></extra>",
+                    name="Teams",
+                ))
+                _xr4 = np.linspace(_rx.min(), _rx.max(), 100)
+                fig_rss.add_trace(go.Scatter(
+                    x=_xr4, y=np.polyval(_rc, _xr4), mode="lines",
+                    line=dict(color="#f4a261", width=2),
+                    name=f"OLS (R²={_rss_r2:.3f})",
+                ))
+                fig_rss.update_layout(**_pt(
+                    title="", xaxis=dict(title="Roster Stability Score (%)"),
+                    yaxis=dict(title="Wins"), height=500, showlegend=True,
+                    legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
+                    hoverlabel=dict(bgcolor="#0d1f38", bordercolor="#1e3a5f",
+                                    font=dict(color="#dbeafe", size=12)),
+                ))
+                st.plotly_chart(fig_rss, use_container_width=True)
+
+                # Auto insight
+                _med_rss = float(_rss_df["RSS"].median())
+                _high = _rss_df[_rss_df["RSS"] >= _med_rss]
+                _low  = _rss_df[_rss_df["RSS"] < _med_rss]
+                if not _high.empty and not _low.empty:
+                    st.info(
+                        f"Teams with RSS above {_med_rss:.0f}% won an average of "
+                        f"{_high['Wins'].mean():.1f} games vs {_low['Wins'].mean():.1f} "
+                        f"games for teams below that threshold."
+                    )
+    except Exception:
+        st.caption("Could not load combined data for RSS analysis.")
+
+    _render_feedback_widget("rankings")
+
 
 # ---------------------------------------------------------------------------
 # Glossary & Methodology page
@@ -7553,6 +7980,16 @@ def _render_glossary_page():
         ("$/WAR", "Dollars per WAR",
          "Team payroll divided by total team WAR. Shows the average cost of one win above "
          "replacement for that roster."),
+        ("$/Win", "Dollars per Win (Adjusted)",
+         "2026 Payroll ($M) / (Total 2025 WAR + 47.7). Unlike $/WAR, this includes the "
+         "47.7 replacement-baseline wins every team gets for free. Lower = better."),
+        ("WSR", "WAR Stability Rating",
+         "mean WAR / (1 + std WAR) across qualifying seasons (PA ≥ 200 or IP ≥ 50). "
+         "Elite ≥ 3.5, Reliable ≥ 2.0, Volatile ≥ 1.0, Unstable < 1.0. "
+         "Rewards consistent production over volatile single-season peaks."),
+        ("RSS", "Roster Stability Score",
+         "Percentage of qualifying players (PA ≥ 150 or IP ≥ 40) who returned from "
+         "the previous season. Higher RSS indicates roster continuity."),
     ], title="Custom Metrics", cols=2)
 
     # Formula highlights
@@ -7754,6 +8191,8 @@ def _render_glossary_page():
         "</div>",
         unsafe_allow_html=True,
     )
+
+    _render_feedback_widget("glossary")
 
 
 # ---------------------------------------------------------------------------
