@@ -990,7 +990,7 @@ def _render_nav_bar():
   background: #0e1720 !important;
   border-right: 1px solid #1e3250 !important;
 }
-.block-container { padding-top: 3rem !important; }
+.block-container { padding-top: 1rem !important; }
 
 /* ── Cards / containers ───────────────────────────────────────────── */
 [data-testid="stExpander"] {
@@ -2005,13 +2005,12 @@ def _render_home_page():
     # ------------------------------------------------------------------
     st.markdown("""
     <style>
-    /* ── wrapper ─────────────────────────────────────────────────── */
+    /* ── wrapper — full-width, no box, same bg as app ────────────── */
     .home-wrap {
         position: relative;
-        height: 840px;
+        min-height: 100vh;
         overflow: hidden;
-        border-radius: 20px;
-        background: #07101e;
+        background: #111927;
     }
 
     /* ── background carousel layer ───────────────────────────────── */
@@ -2029,17 +2028,17 @@ def _render_home_page():
     .cr-row   { overflow: hidden; }
     .cr-track { display: flex; width: max-content; }
 
-    .cr-go-r  { animation: go-r 55s linear infinite; }
-    .cr-go-l  { animation: go-l 62s linear infinite; }
-    .cr-go-r3 { animation: go-r 48s linear infinite; animation-delay: -22s; }
+    .cr-go-l1 { animation: go-l 55s linear infinite; }
+    .cr-go-r  { animation: go-r 62s linear infinite; }
+    .cr-go-l3 { animation: go-l 48s linear infinite; animation-delay: -22s; }
 
     @keyframes go-r {
-        0%   { transform: translateX(0);    }
-        100% { transform: translateX(-50%); }
-    }
-    @keyframes go-l {
         0%   { transform: translateX(-50%); }
         100% { transform: translateX(0);    }
+    }
+    @keyframes go-l {
+        0%   { transform: translateX(0);    }
+        100% { transform: translateX(-50%); }
     }
     .cr-img {
         width: 180px; height: 180px;
@@ -2049,15 +2048,15 @@ def _render_home_page():
 
     /* ── foreground layer ─────────────────────────────────────────── */
     .home-fg {
-        position: absolute;
-        inset: 0;
+        position: relative;
         z-index: 1;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
+        min-height: 100vh;
         gap: 0.45rem;
-        padding: 1.6rem 2rem 1rem;
+        padding: 1.6rem 2rem 2rem;
     }
     /* gradient only on the text — emoji lives in its own span */
     .home-title-grad {
@@ -2091,12 +2090,13 @@ def _render_home_page():
         grid-template-columns: repeat(4, 1fr);
         gap: 1rem;
         width: 100%;
+        max-width: 1100px;
         margin-top: 0.5rem;
     }
     .h-card {
-        background: rgba(8, 20, 40, 0.84);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
+        background: rgba(17, 25, 39, 0.88);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
         border: 1px solid rgba(96,165,250,0.22);
         border-radius: 14px;
         padding: 1.3rem 0.9rem 1.1rem;
@@ -2149,9 +2149,9 @@ def _render_home_page():
         n = len(imgs)
         t = n // 3
         bg_rows = (
-            _strip(imgs,                    "cr-go-r")   # row 1 → scrolls right
-          + _strip(imgs[t:]  + imgs[:t],    "cr-go-l")   # row 2 → scrolls left
-          + _strip(imgs[2*t:]+ imgs[:2*t],  "cr-go-r3")  # row 3 → scrolls right (phase-offset)
+            _strip(imgs,                    "cr-go-l1")  # row 1 → scrolls left
+          + _strip(imgs[t:]  + imgs[:t],    "cr-go-r")   # row 2 → scrolls right
+          + _strip(imgs[2*t:]+ imgs[:2*t],  "cr-go-l3")  # row 3 → scrolls left (phase-offset)
         )
     else:
         bg_rows = ""
@@ -2170,7 +2170,7 @@ def _render_home_page():
     )
 
     # ------------------------------------------------------------------
-    # Render wrapper: background carousels + foreground hero + cards
+    # Render: carousel background fills the page, foreground overlays
     # ------------------------------------------------------------------
     st.markdown(f"""
     <div class="home-wrap">
@@ -7352,9 +7352,11 @@ def main():
     except Exception:
         pass
 
-    _render_nav_bar()
-
     page = st.session_state.get("page", "league")
+
+    # Skip nav bar on the home page — it has its own navigation cards
+    if page != "home":
+        _render_nav_bar()
 
     if page == "home":
         _render_home_page()
