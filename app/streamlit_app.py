@@ -7173,10 +7173,10 @@ def _render_rankings_page():
 .rk-hdr .rk-sub{font-size:0.72rem;color:#7a9ebc;margin-top:0.15rem;}
 .rk-answer{background:#18243a;border:1px solid #1e3250;border-radius:10px;
   padding:0.7rem 0.8rem;text-align:center;}
-.rk-answer .rk-q{font-size:0.60rem;color:#4a687e;text-transform:uppercase;
-  letter-spacing:0.05em;margin-bottom:0.2rem;}
+.rk-answer .rk-q{font-size:0.68rem;color:#93b8d8;text-transform:uppercase;
+  letter-spacing:0.05em;margin-bottom:0.2rem;font-weight:600;}
 .rk-answer .rk-team{font-size:1.25rem;font-weight:800;color:#d6e8f8;line-height:1.1;}
-.rk-answer .rk-val{font-size:0.74rem;color:#7a9ebc;margin-top:0.2rem;}
+.rk-answer .rk-val{font-size:0.78rem;color:#93b8d8;margin-top:0.2rem;}
 .rk-answer .rk-icon{font-size:1.3rem;margin-bottom:0.15rem;line-height:1;}
 </style>""", unsafe_allow_html=True)
 
@@ -7273,48 +7273,52 @@ def _render_rankings_page():
     _overperf  = yr_df.loc[yr_df["wins_vs_pred"].idxmax()]
     _best_dpw  = yr_df.loc[yr_df["DPW"].idxmin()]
 
+    # Use full team names if available
+    def _full(row):
+        return row.get("Team_Full") or row["Team"]
+
     qa1, qa2, qa3 = st.columns(3)
     qa4, qa5, qa6 = st.columns(3)
 
     with qa1:
         st.markdown(_qa(
-            "🏆", "Most Efficient Spend",
-            _best_eff["Team"],
+            "🏆", "Best Value",
+            _full(_best_eff),
             f"${_best_eff['dollar_gap_M']:.0f}M below the line",
             "#1e4a1e",
         ), unsafe_allow_html=True)
     with qa2:
         st.markdown(_qa(
-            "⭐", "Highest Team WAR",
-            _top_war["Team"],
-            f"{_top_war['team_WAR']:.1f} total WAR",
+            "🔴", "Most Overspent",
+            _full(_worst_eff),
+            f"${_worst_eff['dollar_gap_M']:.0f}M above the line",
+            "#280c0c",
         ), unsafe_allow_html=True)
     with qa3:
         st.markdown(_qa(
-            "🏅", "Most Wins",
-            _top_wins["Team"],
-            f"{int(_top_wins['Wins'])} wins",
+            "⭐", "Top WAR",
+            _full(_top_war),
+            f"{_top_war['team_WAR']:.1f} total WAR",
         ), unsafe_allow_html=True)
     with qa4:
         st.markdown(_qa(
-            "📈", "Most Overperforming",
-            _overperf["Team"],
-            f"+{_overperf['wins_vs_pred']:.1f} wins vs payroll prediction",
-            "#0c2218",
+            "🏅", "Most Wins",
+            _full(_top_wins),
+            f"{int(_top_wins['Wins'])} wins",
         ), unsafe_allow_html=True)
     with qa5:
         st.markdown(_qa(
-            "💰", "Best $/WAR",
-            _best_dpw["Team"],
-            f"${_best_dpw['DPW']:.2f}M per WAR",
-            "#1a1228",
+            "📈", "Top Overperformer",
+            _full(_overperf),
+            f"+{_overperf['wins_vs_pred']:.1f} wins vs prediction",
+            "#0c2218",
         ), unsafe_allow_html=True)
     with qa6:
         st.markdown(_qa(
-            "🔴", "Most Overspending",
-            _worst_eff["Team"],
-            f"${_worst_eff['dollar_gap_M']:.0f}M above the line",
-            "#280c0c",
+            "💰", "Best $/WAR",
+            _full(_best_dpw),
+            f"${_best_dpw['DPW']:.1f}M per WAR",
+            "#1a1228",
         ), unsafe_allow_html=True)
 
     st.markdown("<div style='margin-top:0.8rem;'></div>", unsafe_allow_html=True)
@@ -7337,10 +7341,15 @@ def _render_rankings_page():
             textfont=dict(color="#d6e8f8", size=9),
             hovertemplate="%{y}: %{text}<extra></extra>",
         ))
+        _xaxis = dict(title=x_label, zeroline=zero_line,
+                       zerolinecolor="#4a687e", zerolinewidth=1)
+        # Center 0 on charts with diverging values
+        if zero_line and vals:
+            _abs_max = max(abs(v) for v in vals) * 1.15
+            _xaxis["range"] = [-_abs_max, _abs_max]
         fig.update_layout(**_pt(
             title=title,
-            xaxis=dict(title=x_label, zeroline=zero_line,
-                       zerolinecolor="#4a687e", zerolinewidth=1),
+            xaxis=_xaxis,
             yaxis=dict(autorange="reversed"),
             height=max(340, len(df_in) * 22),
             margin=dict(l=60, r=80, t=42, b=30),
@@ -7369,11 +7378,11 @@ def _render_rankings_page():
             ), use_container_width=True, config={"displayModeBar": False})
         with tb1:
             _e = _eff[["Rank", "Team", "dollar_gap_M", "payroll_M", "Wins", "in_playoffs"]].copy()
-            _e.columns = ["#", "Team", "Gap $M", "Payroll $M", "Wins", "PO"]
+            _e.columns = ["#", "Team", "Gap $M", "Payroll $M", "Wins", "Postseason"]
             _e["Gap $M"]     = _e["Gap $M"].round(0).astype(int)
             _e["Payroll $M"] = _e["Payroll $M"].round(0).astype(int)
             _e["Wins"]       = _e["Wins"].round(0).astype(int)
-            _e["PO"]         = _e["PO"].map({True: "✓", False: ""})
+            _e["Postseason"]  = _e["Postseason"].map({True: "✓", False: ""})
 
             def _eff_clr(row):
                 g = row["Gap $M"]
@@ -7412,12 +7421,12 @@ def _render_rankings_page():
             ), use_container_width=True, config={"displayModeBar": False})
         with tb2:
             _w = _war[["Rank", "Team", "team_WAR", "payroll_M", "DPW", "Wins", "in_playoffs"]].copy()
-            _w.columns = ["#", "Team", "WAR", "Payroll $M", "$/WAR M", "Wins", "PO"]
+            _w.columns = ["#", "Team", "WAR", "Payroll $M", "$/WAR M", "Wins", "Postseason"]
             _w["WAR"]        = _w["WAR"].round(1)
             _w["Payroll $M"] = _w["Payroll $M"].round(0).astype(int)
-            _w["$/WAR M"]    = _w["$/WAR M"].round(2)
+            _w["$/WAR M"]    = _w["$/WAR M"].round(1)
             _w["Wins"]       = _w["Wins"].round(0).astype(int)
-            _w["PO"]         = _w["PO"].map({True: "✓", False: ""})
+            _w["Postseason"]  = _w["Postseason"].map({True: "✓", False: ""})
 
             def _war_clr(row):
                 if row["#"] <= 5:  return ["background-color:#0c2218"] * len(row)
@@ -7455,12 +7464,12 @@ def _render_rankings_page():
             ), use_container_width=True, config={"displayModeBar": False})
         with tb3:
             _s = _sal[["Rank", "Team", "payroll_M", "team_WAR", "DPW", "Wins", "in_playoffs"]].copy()
-            _s.columns = ["#", "Team", "Payroll $M", "WAR", "$/WAR M", "Wins", "PO"]
+            _s.columns = ["#", "Team", "Payroll $M", "WAR", "$/WAR M", "Wins", "Postseason"]
             _s["Payroll $M"] = _s["Payroll $M"].round(0).astype(int)
             _s["WAR"]        = _s["WAR"].round(1)
-            _s["$/WAR M"]    = _s["$/WAR M"].round(2)
+            _s["$/WAR M"]    = _s["$/WAR M"].round(1)
             _s["Wins"]       = _s["Wins"].round(0).astype(int)
-            _s["PO"]         = _s["PO"].map({True: "✓", False: ""})
+            _s["Postseason"]  = _s["Postseason"].map({True: "✓", False: ""})
 
             def _sal_clr(row):
                 if row["#"] <= 5:   return ["background-color:#2d1f0c"] * len(row)
@@ -7496,12 +7505,12 @@ def _render_rankings_page():
         with tb4:
             _vp = _wvp[["Rank", "Team", "Wins", "pred_wins", "wins_vs_pred",
                          "payroll_M", "in_playoffs"]].copy()
-            _vp.columns = ["#", "Team", "Wins", "Predicted", "Δ Wins", "Payroll $M", "PO"]
+            _vp.columns = ["#", "Team", "Wins", "Predicted", "Δ Wins", "Payroll $M", "Postseason"]
             _vp["Wins"]       = _vp["Wins"].round(0).astype(int)
             _vp["Predicted"]  = _vp["Predicted"].round(1)
             _vp["Δ Wins"]     = _vp["Δ Wins"].round(1)
             _vp["Payroll $M"] = _vp["Payroll $M"].round(0).astype(int)
-            _vp["PO"]         = _vp["PO"].map({True: "✓", False: ""})
+            _vp["Postseason"]  = _vp["Postseason"].map({True: "✓", False: ""})
 
             def _vp_clr(row):
                 d = row["Δ Wins"]
@@ -7558,7 +7567,16 @@ def _render_rankings_page():
     # Feature 1 — "Does WAR Translate to Wins?"
     # ══════════════════════════════════════════════════════════════════════
     st.markdown("---")
-    st.markdown("### Does WAR Translate to Wins?")
+    st.markdown("### WAR-to-Wins Relationship")
+    st.markdown(
+        "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
+        "Team WAR (total roster talent) is one of the strongest predictors of regular-season wins. "
+        "Each dot below is one team-season. <span style='color:#22c55e;font-weight:600;'>Green</span> = "
+        "made the playoffs. The orange regression line shows the expected wins for a given WAR level. "
+        "The vertical blue dashed line marks the ~30 WAR threshold — teams consistently above it are "
+        "postseason contenders.</div>",
+        unsafe_allow_html=True,
+    )
 
     if "team_WAR" in detail_df.columns and "Wins" in detail_df.columns:
         _f1 = detail_df.dropna(subset=["team_WAR", "Wins"]).copy()
@@ -7576,7 +7594,13 @@ def _render_rankings_page():
             _ss_tot = np.sum((_y - _y.mean()) ** 2)
             _r2 = 1 - (_ss_res / _ss_tot) if _ss_tot > 0 else 0
 
-            st.caption(f"WAR explains **{_r2 * 100:.1f}%** of win variation across 2021–2025 team-seasons.")
+            st.markdown(
+                f"<div style='font-size:0.88rem;color:#d6e8f8;font-weight:600;margin-bottom:0.5rem;'>"
+                f"WAR explains <span style='color:#60a5fa;'>{_r2 * 100:.1f}%</span> of win variation "
+                f"across {len(_f1)} team-seasons (2021–2025). Each additional WAR is worth roughly "
+                f"<span style='color:#60a5fa;'>{_coef[0]:.2f}</span> wins.</div>",
+                unsafe_allow_html=True,
+            )
 
             # Build scatter
             _f1_playoff = _f1.get("in_playoffs", pd.Series([False] * len(_f1)))
@@ -7606,13 +7630,17 @@ def _render_rankings_page():
                              annotation_font_color="#3b6fd4")
 
             fig_f1.update_layout(**_pt(
-                title="", xaxis=dict(title="Total Team WAR"), yaxis=dict(title="Actual Wins"),
-                height=500, showlegend=True,
+                title="Team WAR vs Actual Wins (2021–2025)",
+                xaxis=dict(title="Total Team WAR"),
+                yaxis=dict(title="Actual Wins"),
+                height=480, showlegend=True,
                 legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
                 hoverlabel=dict(bgcolor="#0d1f38", bordercolor="#1e3a5f",
                                 font=dict(color="#dbeafe", size=12)),
             ))
-            st.plotly_chart(fig_f1, use_container_width=True)
+            _f1_col, _ = st.columns([4, 1])
+            with _f1_col:
+                st.plotly_chart(fig_f1, use_container_width=True)
 
         # 1B — Efficiency vs Postseason table
         if {"dollar_gap_M", "in_playoffs", "ws_champ"}.issubset(detail_df.columns):
@@ -7657,17 +7685,30 @@ def _render_rankings_page():
                     f"{len(_eff_bad)} least efficient teams."
                 )
 
-            st.caption(
-                "Research context: Over the past decade, World Series champions averaged 8th in "
-                "payroll — efficient roster construction matters more than total spend once you "
-                "reach the postseason."
+            st.markdown(
+                "<div style='background:#0d1e35;border-left:3px solid #3b6fd4;border-radius:0 8px 8px 0;"
+                "padding:0.7rem 1rem;margin-top:0.6rem;font-size:0.82rem;color:#93b8d8;line-height:1.6;'>"
+                "<b style='color:#60a5fa;'>Research context:</b> Over the past decade, World Series "
+                "champions averaged 8th in payroll — efficient roster construction matters more than "
+                "total spend once you reach the postseason.</div>",
+                unsafe_allow_html=True,
             )
 
     # ══════════════════════════════════════════════════════════════════════
     # Feature 2 — Incremental Spending Impact
     # ══════════════════════════════════════════════════════════════════════
     st.markdown("---")
-    st.markdown("### What Does an Extra Dollar Buy?")
+    st.markdown("### Marginal Spending Impact")
+    st.markdown(
+        "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
+        "Not all dollars are equal. The first $100M of payroll typically delivers far more wins "
+        "per dollar than going from $244M to $300M+. Each bar below shows how many additional wins "
+        "a team can expect per $10M spent within that spending tier, based on 2021–2025 data. "
+        "<span style='color:#22c55e;font-weight:600;'>Green</span> = strong return, "
+        "<span style='color:#f59e0b;font-weight:600;'>amber</span> = moderate, "
+        "<span style='color:#ef4444;font-weight:600;'>red</span> = diminishing returns.</div>",
+        unsafe_allow_html=True,
+    )
 
     if {"payroll_M", "Wins"}.issubset(detail_df.columns):
         _f2 = detail_df.dropna(subset=["payroll_M", "Wins"]).copy()
@@ -7702,14 +7743,19 @@ def _render_rankings_page():
             textposition="outside", textfont=dict(color="#dbeafe", size=10),
             hovertemplate="%{y}: %{x:.2f} wins per $10M<extra></extra>",
         ))
+        _xmax_f2 = max(abs(v) for v in _sl_vals) * 1.5 if _sl_vals else 3
         fig_f2.update_layout(**_pt(
             title="Marginal Wins per $10M by Spending Tier",
-            xaxis=dict(title="Wins per $10M spent"),
+            xaxis=dict(title="Wins per $10M spent",
+                       zeroline=True, zerolinecolor="#4a687e", zerolinewidth=1,
+                       range=[-_xmax_f2, _xmax_f2]),
             yaxis=dict(autorange="reversed"),
             height=300,
-            margin=dict(l=180, r=40, t=40, b=40),
+            margin=dict(l=180, r=80, t=40, b=40),
         ))
-        st.plotly_chart(fig_f2, use_container_width=True)
+        _f2_col, _ = st.columns([4, 1])
+        with _f2_col:
+            st.plotly_chart(fig_f2, use_container_width=True)
 
         # 2B — Interactive slider
         _spend_add = st.slider("Add spending ($M)", 0, 50, 10, step=5,
@@ -7733,7 +7779,14 @@ def _render_rankings_page():
     # Feature 4 — Roster Stability Score (RSS) vs Wins
     # ══════════════════════════════════════════════════════════════════════
     st.markdown("---")
-    st.markdown("### Does Roster Stability Predict Wins?")
+    st.markdown("### Roster Stability and Win Correlation")
+    st.markdown(
+        "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
+        "Roster Stability Score (RSS) measures what percentage of a team's qualifying players "
+        "returned from the prior season. Higher RSS means more continuity. "
+        "<span style='color:#22c55e;font-weight:600;'>Green</span> dots made the postseason.</div>",
+        unsafe_allow_html=True,
+    )
 
     _comb_path_4 = _data_url("data/mlb_combined_2021_2025.csv")
     try:
@@ -7803,13 +7856,16 @@ def _render_rankings_page():
                     name=f"OLS (R²={_rss_r2:.3f})",
                 ))
                 fig_rss.update_layout(**_pt(
-                    title="", xaxis=dict(title="Roster Stability Score (%)"),
-                    yaxis=dict(title="Wins"), height=500, showlegend=True,
+                    title="Roster Stability vs Win Total",
+                    xaxis=dict(title="Roster Stability Score (%)"),
+                    yaxis=dict(title="Wins"), height=480, showlegend=True,
                     legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
                     hoverlabel=dict(bgcolor="#0d1f38", bordercolor="#1e3a5f",
                                     font=dict(color="#dbeafe", size=12)),
                 ))
-                st.plotly_chart(fig_rss, use_container_width=True)
+                _rss_col, _ = st.columns([4, 1])
+                with _rss_col:
+                    st.plotly_chart(fig_rss, use_container_width=True)
 
                 # Auto insight
                 _med_rss = float(_rss_df["RSS"].median())
