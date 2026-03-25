@@ -2452,16 +2452,15 @@ def _render_home_page():
     """Landing page: 3 faded carousel rows as background, feature cards in foreground."""
     _CARDS = [
         ("rankings",  "🏆", "Rankings",
-         "All 30 teams ranked by efficiency, WAR, payroll, and win performance. "
+         "All 30 MLB teams ranked by efficiency, fWAR, payroll, and win performance. "
          "See which franchises get the most wins per dollar and which are overspending."),
         ("league",    "📊", "Player Analysis",
-         "Player-level cost effective line, PPEL regression, WAR stability ratings, "
+         "Player-level cost effective line, PPEL regression, fWAR stability ratings, "
          "and age trajectory analysis across 4,000+ player-seasons."),
         ("simulator", "🎮", "Roster Simulator",
-         "Build custom MLB rosters from every 2025 player. Analyse position coverage, "
-         "contract health, Pay vs Play efficiency, and estimated win totals."),
+         "Build customized MLB rosters to optimize pay vs performance efficiency."),
         ("glossary",  "📖", "Glossary & Methodology",
-         "Every metric explained in detail — WAR, PPEL, CBT thresholds, WSR, "
+         "Every metric explained in detail — fWAR, PPEL, CBT thresholds, WSR, "
          "efficiency formulas, roster grades, and how we calculate each one."),
     ]
 
@@ -2493,9 +2492,9 @@ def _render_home_page():
     .cr-row   { overflow: hidden; }
     .cr-track { display: flex; width: max-content; }
 
-    .cr-go-l1 { animation: go-l 55s linear infinite; }
-    .cr-go-r  { animation: go-r 62s linear infinite; }
-    .cr-go-l3 { animation: go-l 48s linear infinite; animation-delay: -22s; }
+    .cr-go-l1 { animation: go-l 90s linear infinite; }
+    .cr-go-r  { animation: go-r 100s linear infinite; }
+    .cr-go-l3 { animation: go-l 80s linear infinite; animation-delay: -22s; }
 
     @keyframes go-r {
         0%   { transform: translateX(-50%); }
@@ -2506,9 +2505,9 @@ def _render_home_page():
         100% { transform: translateX(-50%); }
     }
     .cr-img {
-        width: 180px; height: 180px;
+        width: 210px; height: 210px;
         object-fit: cover; object-position: top center;
-        border-radius: 10px; margin: 0 8px; flex-shrink: 0;
+        border-radius: 10px; margin: 0 10px; flex-shrink: 0;
     }
 
     /* ── foreground layer ─────────────────────────────────────────── */
@@ -2544,8 +2543,22 @@ def _render_home_page():
         text-transform: uppercase; text-align: center;
     }
     .home-mission {
-        font-size: 0.82rem; color: #7a9ebc; text-align: center;
-        max-width: 680px; line-height: 1.7; margin: 0.3rem auto;
+        font-size: 0.85rem; color: #93b8d8; text-align: center;
+        max-width: 700px; line-height: 1.7; margin: 0.4rem auto;
+    }
+    /* scrolling tagline */
+    .home-ticker {
+        width: 100%; overflow: hidden; white-space: nowrap;
+        font-size: 0.72rem; color: #3d6888; letter-spacing: 0.18em;
+        text-transform: uppercase; margin-bottom: 0.3rem;
+    }
+    .home-ticker span {
+        display: inline-block;
+        animation: ticker-scroll 18s linear infinite;
+    }
+    @keyframes ticker-scroll {
+        0%   { transform: translateX(100%); }
+        100% { transform: translateX(-100%); }
     }
     .home-rule {
         width: 52%; border: none;
@@ -2647,7 +2660,7 @@ def _render_home_page():
         .home-sub { font-size: 0.68rem; letter-spacing: 0.15em; }
         .home-rule { width: 80%; }
         .home-cta { font-size: 0.65rem; }
-        .cr-img { width: 100px; height: 100px; margin: 0 4px; border-radius: 6px; }
+        .cr-img { width: 120px; height: 120px; margin: 0 5px; border-radius: 6px; }
     }
 
     /* ── Home page — Small phone ─────────────────────────────────── */
@@ -2711,12 +2724,13 @@ def _render_home_page():
     <div class="home-wrap">
       <div class="home-bg">{bg_rows}</div>
       <div class="home-fg">
+        <div class="home-ticker"><span>MLB Toolbox: Built by fans for fans &nbsp;&nbsp;&nbsp;⚾&nbsp;&nbsp;&nbsp; MLB Toolbox: Built by fans for fans &nbsp;&nbsp;&nbsp;⚾&nbsp;&nbsp;&nbsp;</span></div>
         <div style="text-align:center;display:flex;align-items:center;justify-content:center;">
           <span class="home-title-grad">MLB Toolbox</span><span class="home-ball">&#9918;</span>
         </div>
         <div class="home-sub">Data &nbsp;&middot;&nbsp; Analysis &nbsp;&middot;&nbsp; Baseball</div>
         <div class="home-mission">
-          <!-- Mission statement placeholder — update with your research statement -->
+          Provide baseball fans with visualization tools and metrics to better track, rank and forecast team and player cost-per-win efficiency
         </div>
         <hr class="home-rule">
         <div class="home-cta">Choose a tool to get started</div>
@@ -7262,7 +7276,7 @@ def _render_rankings_page():
     st.markdown(
         "<div class='rk-hdr'>"
         "<h2>🏆 MLB Efficiency Rankings</h2>"
-        "<div class='rk-sub'>All 30 teams ranked by spending efficiency, WAR production, "
+        "<div class='rk-sub'>All 30 MLB teams ranked by spending efficiency, fWAR production, "
         "payroll, and win performance. Efficiency measures how far above or below the "
         "cost-effective line each team sits — negative means winning more per dollar.</div>"
         "</div>",
@@ -7299,9 +7313,9 @@ def _render_rankings_page():
         ("Efficiency Gap", "Dollars Above/Below the CEL",
          "How many $M a team's payroll sits above or below what their win total 'should' cost at market rate. "
          "Negative (green) = efficient — winning more per dollar. Positive (red) = overspending."),
-        ("$/WAR",          "Dollars per Win Above Replacement",
-         "Average cost of one WAR for this team's roster in the selected season. "
-         "League average free-agent rate is ~$7–9M/WAR; Pre-Arb players cost far less."),
+        ("$/fWAR",         "Dollars per fWAR",
+         "Average cost of one fWAR for this team's roster in the selected season. "
+         "League average free-agent rate is ~$7–9M/fWAR; Pre-Arb players cost far less."),
         ("Wins vs Pred.",  "Wins Above Payroll Prediction",
          "Actual wins minus the wins predicted by the payroll regression. "
          "Positive = team beats their expected win total given their spending (e.g. strong coaching, "
@@ -7309,8 +7323,8 @@ def _render_rankings_page():
         ("Avg Gap $M",     "5-Year Average Efficiency Gap",
          "Average dollars above or below the CEL per season across 2021–2025. "
          "Consistently negative teams (Tampa Bay, Cleveland) build wins efficiently year over year."),
-        ("WAR",            "Wins Above Replacement (Team)",
-         "Sum of all player WAR on the 40-man roster for the season. "
+        ("fWAR",           "FanGraphs Wins Above Replacement (Team)",
+         "Sum of all player fWAR on the 40-man roster for the season. "
          "Reflects total roster talent independent of lineup decisions or luck."),
     ], title="📖 Terms & Definitions")
 
@@ -7342,35 +7356,35 @@ def _render_rankings_page():
 
     with qa1:
         st.markdown(_qa(
-            "🏆", "Best Value",
+            "🏆", "Most Efficient",
             _full(_best_eff),
             f"${_best_eff['dollar_gap_M']:.0f}M below the line",
             "#1e4a1e",
-            "Lowest efficiency gap — this team wins the most relative to their payroll",
+            "This team won the most games relative to payroll $ spent",
         ), unsafe_allow_html=True)
     with qa2:
         st.markdown(_qa(
-            "🔴", "Most Overspent",
-            _full(_worst_eff),
-            f"${_worst_eff['dollar_gap_M']:.0f}M above the line",
-            "#280c0c",
-            "Highest efficiency gap — paying the most above market rate for their win total",
+            "📈", "Top Overperformer",
+            _full(_overperf),
+            f"+{_overperf['wins_vs_pred']:.1f} wins vs forecast",
+            "#0c2218",
+            "This team had the most wins relative to forecast based on payroll $ spent",
         ), unsafe_allow_html=True)
     with qa3:
         st.markdown(_qa(
-            "💰", "Best $/WAR",
-            _full(_best_dpw),
-            f"${_best_dpw['DPW']:.1f}M per WAR",
-            "#1a1228",
-            "Lowest cost per WAR — the most production per dollar on the roster",
+            "🔴", "High Roller",
+            _full(_worst_eff),
+            f"${_worst_eff['dollar_gap_M']:.0f}M above the line",
+            "#280c0c",
+            "This team spent the most payroll $ for level of wins earned",
         ), unsafe_allow_html=True)
     with qa4:
         st.markdown(_qa(
-            "📈", "Top Overperformer",
-            _full(_overperf),
-            f"+{_overperf['wins_vs_pred']:.1f} wins vs prediction",
-            "#0c2218",
-            "Most wins above what payroll regression predicts — coaching, development, or luck",
+            "💰", "Best $ per fWAR",
+            _full(_best_dpw),
+            f"${_best_dpw['DPW']:.1f}M per fWAR",
+            "#1a1228",
+            "Lowest cost per fWAR — the most production per dollar on the roster",
         ), unsafe_allow_html=True)
     with qa5:
         st.markdown(_qa(
@@ -7381,17 +7395,17 @@ def _render_rankings_page():
         ), unsafe_allow_html=True)
     with qa6:
         st.markdown(_qa(
-            "⭐", "Top WAR",
+            "⭐", "Top fWAR",
             _full(_top_war),
-            f"{_top_war['team_WAR']:.1f} total WAR",
-            tooltip="Highest total roster WAR — sum of all player contributions above replacement",
+            f"{_top_war['team_WAR']:.1f} total fWAR",
+            tooltip="Highest total roster fWAR — sum of all player contributions above replacement",
         ), unsafe_allow_html=True)
 
     st.markdown("<div style='margin-top:0.8rem;'></div>", unsafe_allow_html=True)
 
     # ── Ranking tabs ─────────────────────────────────────────────────────────
     rt1, rt2, rt3, rt4 = st.tabs([
-        "🏆 Efficiency", "⭐ WAR", "💰 Salary", "📈 Win Performance",
+        "🏆 Efficiency", "⭐ fWAR", "💰 Salary", "📈 Win Performance",
     ])
 
     def _hbar(df_in, x_col, color_fn, title, x_label, text_fn=None, zero_line=False):
@@ -7440,7 +7454,7 @@ def _render_rankings_page():
             st.plotly_chart(_hbar(
                 _eff, "dollar_gap_M",
                 color_fn=lambda v: "#22c55e" if v <= 0 else "#ef4444",
-                title=f"{sel_year} — Efficiency Gap from Cost Effective Line",
+                title=f"{sel_year} — Efficiency Ranking of MLB Team Spending $ to Regular Season Wins",
                 x_label="$ Gap ($M) — negative = efficient",
                 text_fn=lambda v: f"${v:+.0f}M",
                 zero_line=True,
@@ -7488,13 +7502,13 @@ def _render_rankings_page():
                     "#22c55e" if v >= _war_max * 0.85 else
                     "#4873b8" if v >= _war_max * 0.60 else "#4a687e"
                 ),
-                title=f"{sel_year} — Total Team WAR",
-                x_label="Total WAR",
+                title=f"{sel_year} — Total Team fWAR",
+                x_label="Total fWAR",
                 text_fn=lambda v: f"{v:.1f}",
             ), use_container_width=True, config={"displayModeBar": False})
         with tb2:
             _w = _war[["Rank", "Team", "team_WAR", "payroll_M", "DPW", "Wins", "in_playoffs"]].copy()
-            _w.columns = ["#", "Team", "WAR", "Payroll $M", "$/WAR M", "Wins", "Postseason"]
+            _w.columns = ["#", "Team", "fWAR", "Payroll $M", "$/fWAR M", "Wins", "Postseason"]
             _w["Payroll $M"] = _w["Payroll $M"].round(0).astype(int)
             _w["Wins"]       = _w["Wins"].round(0).astype(int)
             _w["Postseason"]  = _w["Postseason"].map({True: "✓", False: ""})
@@ -7506,7 +7520,7 @@ def _render_rankings_page():
 
             st.dataframe(
                 _w.style.apply(_war_clr, axis=1).format(
-                    {"WAR": "{:.1f}", "Payroll $M": "{:d}", "$/WAR M": "{:.1f}", "Wins": "{:d}"}, na_rep="—"),
+                    {"fWAR": "{:.1f}", "Payroll $M": "{:d}", "$/fWAR M": "{:.1f}", "Wins": "{:d}"}, na_rep="—"),
                 hide_index=True, use_container_width=True,
                 height=min(60 + len(_w) * 35, 720),
             )
@@ -7538,7 +7552,7 @@ def _render_rankings_page():
             ), use_container_width=True, config={"displayModeBar": False})
         with tb3:
             _s = _sal[["Rank", "Team", "payroll_M", "team_WAR", "DPW", "Wins", "in_playoffs"]].copy()
-            _s.columns = ["#", "Team", "Payroll $M", "WAR", "$/WAR M", "Wins", "Postseason"]
+            _s.columns = ["#", "Team", "Payroll $M", "WAR", "$/fWAR M", "Wins", "Postseason"]
             _s["Payroll $M"] = _s["Payroll $M"].round(0).astype(int)
             _s["WAR"]        = _s["WAR"].round(1)
             _s["$/WAR M"]    = _s["$/WAR M"].round(1)
@@ -7552,7 +7566,7 @@ def _render_rankings_page():
 
             st.dataframe(
                 _s.style.apply(_sal_clr, axis=1).format(
-                    {"Payroll $M": "{:d}", "WAR": "{:.1f}", "$/WAR M": "{:.1f}", "Wins": "{:d}"}, na_rep="—"),
+                    {"Payroll $M": "{:d}", "WAR": "{:.1f}", "$/fWAR M": "{:.1f}", "Wins": "{:d}"}, na_rep="—"),
                 hide_index=True, use_container_width=True,
                 height=min(60 + len(_s) * 35, 720),
             )
@@ -7646,13 +7660,13 @@ def _render_rankings_page():
     # Feature 1 — "Does WAR Translate to Wins?"
     # ══════════════════════════════════════════════════════════════════════
     st.markdown("---")
-    st.markdown("### WAR-to-Wins Relationship")
+    st.markdown("### fWAR-to-Wins Relationship")
     st.markdown(
         "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
-        "Team WAR (total roster talent) is one of the strongest predictors of regular-season wins. "
+        "Team fWAR (total roster talent) is one of the strongest predictors of regular-season wins. "
         "Each dot below is one team-season. <span style='color:#22c55e;font-weight:600;'>Green</span> = "
-        "made the playoffs. The orange regression line shows the expected wins for a given WAR level. "
-        "The vertical blue dashed line marks the ~30 WAR threshold — teams consistently above it are "
+        "made the playoffs. The orange regression line shows the expected wins for a given fWAR level. "
+        "The vertical blue dashed line marks the ~30 fWAR threshold — teams consistently above it are "
         "postseason contenders.</div>",
         unsafe_allow_html=True,
     )
@@ -7675,8 +7689,8 @@ def _render_rankings_page():
 
             st.markdown(
                 f"<div style='font-size:0.88rem;color:#d6e8f8;font-weight:600;margin-bottom:0.5rem;'>"
-                f"WAR explains <span style='color:#60a5fa;'>{_r2 * 100:.1f}%</span> of win variation "
-                f"across {len(_f1)} team-seasons (2021–2025). Each additional WAR is worth roughly "
+                f"fWAR explains <span style='color:#60a5fa;'>{_r2 * 100:.1f}%</span> of win variation "
+                f"across {len(_f1)} team-seasons (2021–2025). Each additional fWAR is worth roughly "
                 f"<span style='color:#60a5fa;'>{_coef[0]:.2f}</span> wins.</div>",
                 unsafe_allow_html=True,
             )
@@ -7686,7 +7700,7 @@ def _render_rankings_page():
             _f1_colors = ["#22c55e" if p else "#4a687e" for p in _f1_playoff]
             _f1_hover = _f1.apply(lambda r: (
                 f"<b>{r['Team']}</b> {int(r['Year'])}<br>"
-                + f"WAR: {r['team_WAR']:.1f} · Wins: {int(r['Wins'])}<br>"
+                + f"fWAR: {r['team_WAR']:.1f} · Wins: {int(r['Wins'])}<br>"
                 + f"Playoff: {'Yes' if r.get('in_playoffs') else 'No'}"
             ), axis=1)
 
@@ -7709,8 +7723,8 @@ def _render_rankings_page():
                              annotation_font_color="#3b6fd4")
 
             fig_f1.update_layout(**_pt(
-                title="Team WAR vs Actual Wins (2021–2025)",
-                xaxis=dict(title="Total Team WAR"),
+                title="Team fWAR vs Actual Wins (2021–2025)",
+                xaxis=dict(title="Total Team fWAR"),
                 yaxis=dict(title="Actual Wins"),
                 height=440, showlegend=True,
                 legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
@@ -7780,9 +7794,10 @@ def _render_rankings_page():
     st.markdown("### Marginal Spending Impact")
     st.markdown(
         "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
-        "Not all dollars are equal. The first $100M of payroll typically delivers far more wins "
-        "per dollar than going from $244M to $300M+. Each bar below shows how many additional wins "
-        "a team can expect per $10M spent within that spending tier, based on 2021–2025 data. "
+        "Not all payroll dollars spent are equal. The first $100M spent gains the most wins per $ "
+        "than the next tier $244M to $300M+. Based on this nonlinear relationship, each bar below "
+        "shows how many additional wins a team can expect per $10M spent within that spending tier, "
+        "based on 2021–2025 data. "
         "<span style='color:#22c55e;font-weight:600;'>Green</span> = strong return, "
         "<span style='color:#f59e0b;font-weight:600;'>amber</span> = moderate, "
         "<span style='color:#ef4444;font-weight:600;'>red</span> = diminishing returns.</div>",
@@ -8036,7 +8051,9 @@ def _render_glossary_page():
          "positional adjustment."),
         ("bWAR vs fWAR", "Baseball-Reference WAR vs FanGraphs WAR",
          "bWAR (B-Ref) uses RA/9 for pitchers (actual runs); fWAR (FanGraphs) uses FIP "
-         "(fielding-independent). This project uses fWAR exclusively."),
+         "(fielding-independent). This project uses fWAR exclusively. "
+         "FanGraphs WAR (fWAR) is applied given its focus on attempting to predict future "
+         "performance and evaluating player talent level."),
     ], title="Core Baseball Stats", cols=2)
 
     # WAR formula breakdown

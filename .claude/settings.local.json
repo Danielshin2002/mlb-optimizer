@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(unzip -l \"2026 Payroll.zip\")",
+      "Bash(unzip -p \"2026 Payroll.zip\" \"2026 Payroll/Angels-Payroll-2026.xlsx\")",
+      "Skill(update-config)"
+    ]
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  }
+}
