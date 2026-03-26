@@ -5450,28 +5450,29 @@ div[data-testid='column']:first-of-type .stSlider{
 
         # ── Page header card ──────────────────────────────────────────────
         st.markdown(f"""<div class="ef-hdr" style="background:linear-gradient(135deg,#0f2035,#0d1b2a);border:1px solid #1e3a5c;
-border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;
+border-radius:10px;padding:16px 20px;margin-bottom:14px;display:flex;align-items:center;
 justify-content:space-between;gap:16px;flex-wrap:wrap;">
   <div style="flex:1;min-width:200px;">
-    <div style="font-size:18px;font-weight:800;color:#e8f4ff;margin-bottom:3px;">Cost Effective Line</div>
-    <div style="font-size:11px;color:#5a8aaa;line-height:1.5;">
-      Compare every player's actual salary against what the market would predict for their WAR —
-      dots <span style="color:#22c55e;font-weight:600;">below</span> the trendline are underpaid value;
-      dots <span style="color:#ef4444;font-weight:600;">above</span> are overpaid contracts.
+    <div style="font-size:20px;font-weight:800;color:#e8f4ff;margin-bottom:5px;">Player Analysis</div>
+    <div style="font-size:13px;color:#93b8d8;line-height:1.6;">
+      Explore how every MLB player's salary compares to their on-field production (fWAR).
+      Use the tabs below to view the market value regression, multi-year efficiency, age curves,
+      team breakdowns, and player stability ratings. Use the filters on the left to narrow
+      by team, year, position, or career stage.
     </div>
   </div>
   <div class="ef-hdr-stats" style="display:flex;gap:10px;flex-shrink:0;flex-wrap:wrap;">
-    <div style="background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 12px;text-align:center;">
-      <div style="font-size:9px;color:#4a7a9b;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">Players</div>
+    <div style="background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;">
+      <div style="font-size:10px;color:#7a9ebc;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">Players</div>
       <div style="font-size:18px;font-weight:700;color:#e8f4ff;">{_n_shown:,}</div>
     </div>
-    <div style="background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 12px;text-align:center;">
-      <div style="font-size:9px;color:#4a7a9b;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">Median $/WAR</div>
+    <div style="background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;">
+      <div style="font-size:10px;color:#7a9ebc;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">Median $/fWAR</div>
       <div style="font-size:18px;font-weight:700;color:#e8f4ff;">${_med_dpw:.1f}M</div>
     </div>
-    <div style="background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 12px;text-align:center;">
-      <div style="font-size:9px;color:#4a7a9b;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">Active filters</div>
-      <div style="font-size:11px;font-weight:600;color:#a8c8e8;">{_flt_tms} · {_flt_yrs}</div>
+    <div style="background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;">
+      <div style="font-size:10px;color:#7a9ebc;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">Active Filters</div>
+      <div style="font-size:12px;font-weight:600;color:#a8c8e8;">{_flt_tms} · {_flt_yrs}</div>
     </div>
   </div>
 </div>""", unsafe_allow_html=True)
@@ -5493,21 +5494,25 @@ justify-content:space-between;gap:16px;flex-wrap:wrap;">
 
         # ── Tab 1 — Cost Effective Line (PPEL 1/3/5-year views) ──────────
         with t1:
-            _render_glossary([
-                ("PPEL",     "Pay-Performance Efficiency Line",
-                 "The regression line of WAR vs Salary. Represents the league-average cost of a win. "
-                 "Players below the line give more WAR per dollar than average — they are underpaid. "
-                 "Players above the line are overpaid relative to their output."),
-                ("PPR",      "Pay-to-Performance Ratio",
-                 "Total career WAR ÷ total contract value ($M). A PPR > 1.0 means the player has delivered "
-                 "at least one WAR per $M spent — generally considered good value on a multi-year deal."),
-                ("Residual", "Salary Residual",
-                 "Actual salary minus the PPEL-predicted salary for that WAR level. "
-                 "Positive = overpaid (sits above the line). Negative = underpaid (sits below the line)."),
-                ("WAR",      "Wins Above Replacement",
-                 "How many wins a player adds vs a replacement-level fill-in. "
-                 "Scale: 0–1 = bench, 2 = solid starter, 4–5 = All-Star, 7+ = MVP candidate."),
-            ], title="📖 Terms & Definitions", cols=2)
+            st.markdown(
+                "<div style='background:#090f1a;border:1px solid #1e3a5c;border-radius:10px;"
+                "padding:14px 18px;margin-bottom:12px;'>"
+                "<div style='font-size:1rem;font-weight:700;color:#d6e8f8;margin-bottom:6px;'>Cost Effective Line</div>"
+                "<div style='font-size:0.85rem;color:#93b8d8;line-height:1.7;'>"
+                "This scatter plot compares every player's <b>actual salary</b> (Y-axis) against their "
+                "<b>fWAR production</b> (X-axis). The <span style='color:#f4a261;font-weight:600;'>orange trendline</span> "
+                "is the market average — it shows what teams typically pay for a given level of production.<br><br>"
+                "<b>How to read it:</b> Dots <span style='color:#22c55e;font-weight:600;'>below</span> the line "
+                "are bargains (the player produces more than their salary suggests). "
+                "Dots <span style='color:#ef4444;font-weight:600;'>above</span> the line are overpaid relative to output. "
+                "The further from the line, the bigger the gap between actual and market salary.<br><br>"
+                "<b>Key terms:</b> <b>fWAR</b> = FanGraphs Wins Above Replacement — how many extra wins a player "
+                "adds vs a minor-league replacement. <b>PPR</b> = Pay-to-Performance Ratio (career fWAR ÷ total contract $M; "
+                "below 1.0 = underpaid, above 1.0 = overpaid). <b>Residual</b> = actual salary minus the trendline's "
+                "predicted salary (negative = team is getting a deal)."
+                "</div></div>",
+                unsafe_allow_html=True,
+            )
             # ── Frontier Summary card ──────────────────────────────────────
             _stage_ppr     = df.groupby("Stage_Clean")["PPR"].median().sort_values()
             _most_eff_stg  = _stage_ppr.index[0]  if len(_stage_ppr) > 0 else "—"
@@ -5825,6 +5830,19 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
 
         # ── Tab 3 — Age Trajectory ────────────────────────────────────────
         with t3:
+            st.markdown(
+                "<div style='background:#090f1a;border:1px solid #1e3a5c;border-radius:10px;"
+                "padding:14px 18px;margin-bottom:12px;'>"
+                "<div style='font-size:1rem;font-weight:700;color:#d6e8f8;margin-bottom:6px;'>Age Trajectory</div>"
+                "<div style='font-size:0.85rem;color:#93b8d8;line-height:1.7;'>"
+                "See how player production changes as they age. Most players peak in their late 20s "
+                "and decline into their 30s — but the shape varies by position and player type.<br><br>"
+                "<b>How to read it:</b> The line shows the <b>average</b> metric at each age across all "
+                "filtered players. Choose fWAR (production), Salary (cost), or Efficiency (production per $) "
+                "to see different age curves. Split by Player Type or Position to compare groups."
+                "</div></div>",
+                unsafe_allow_html=True,
+            )
             _c1, _c2, _c3 = st.columns([2, 2, 1])
             with _c1:
                 _traj_m = st.selectbox("Metric", ["WAR", "Salary ($M)", "Efficiency (WAR/$M)"], key="ef_traj_m")
@@ -5996,21 +6014,22 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
 
         # ── Tab 2 — PPEL (Pay-Performance Efficiency Line) ───────────────
         with t2:
-            _render_glossary([
-                ("PPEL",  "Pay-Performance Efficiency Line (1-Year)",
-                 "Single-season WAR ÷ single-season salary. The regression line shows the league-average "
-                 "cost of a win. Players below the line are underpaid; above are overpaid."),
-                ("PPEL3", "Pay-Performance Efficiency Line (3-Year)",
-                 "Cumulative WAR over the last 3 seasons ÷ cumulative salary over those seasons. "
-                 "Smooths out single-season variance and reflects sustained performance vs contract value."),
-                ("PPEL5", "Pay-Performance Efficiency Line (5-Year)",
-                 "Cumulative WAR over the last 5 seasons ÷ cumulative salary. "
-                 "Best for evaluating long-term contracts — shows which players have delivered "
-                 "over a full contract cycle."),
-                ("WAR/$M", "WAR per $M Spent",
-                 "Higher = more production per dollar invested. Pre-Arb players often lead this metric "
-                 "because they produce at market rates while earning near the league minimum (~$740K)."),
-            ], title="📖 PPEL Terms", cols=2)
+            st.markdown(
+                "<div style='background:#090f1a;border:1px solid #1e3a5c;border-radius:10px;"
+                "padding:14px 18px;margin-bottom:12px;'>"
+                "<div style='font-size:1rem;font-weight:700;color:#d6e8f8;margin-bottom:6px;'>PPEL — Multi-Year Value Analysis</div>"
+                "<div style='font-size:0.85rem;color:#93b8d8;line-height:1.7;'>"
+                "This view extends the Cost Effective Line across <b>multiple seasons</b> to separate "
+                "one-year flukes from sustained performance. Use the toggle to switch between 1-year, "
+                "3-year, and 5-year windows.<br><br>"
+                "<b>Why it matters:</b> A single great season can make a player look like a bargain, but "
+                "PPEL3 and PPEL5 show whether that value held up over a full contract. Players who "
+                "consistently sit below the line are the truly elite values in baseball.<br><br>"
+                "<b>fWAR/$M</b> = fWAR per million dollars spent. Higher is better. "
+                "Pre-Arb players often dominate this metric because they produce at near league-minimum salary (~$740K)."
+                "</div></div>",
+                unsafe_allow_html=True,
+            )
             # Controls in a compact horizontal row above the chart
             _tc1, _tc2, _tc3, _tc4 = st.columns([1.4, 1, 1.2, 1])
             with _tc1:
@@ -6504,11 +6523,25 @@ display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
 
         # ── Tab 8 — WAR Stability (WSR) ─────────────────────────────────
         with t8:
-            _render_glossary([
-                ("WSR", "WAR Stability Rating",
-                 "mean WAR / (1 + std WAR) across qualifying seasons (PA ≥ 200 or IP ≥ 50). "
-                 "Rewards consistent production over volatile peaks."),
-            ], title="📖 WAR Stability", cols=1)
+            st.markdown(
+                "<div style='background:#090f1a;border:1px solid #1e3a5c;border-radius:10px;"
+                "padding:14px 18px;margin-bottom:12px;'>"
+                "<div style='font-size:1rem;font-weight:700;color:#d6e8f8;margin-bottom:6px;'>fWAR Stability Rating (WSR)</div>"
+                "<div style='font-size:0.85rem;color:#93b8d8;line-height:1.7;'>"
+                "Not all high-fWAR players are equally reliable. This chart plots each player's "
+                "<b>average fWAR</b> (X-axis) against their <b>standard deviation</b> (Y-axis) — "
+                "a measure of how much their production swings from year to year.<br><br>"
+                "<b>How to read it:</b> Bottom-right = <span style='color:#22c55e;font-weight:600;'>Cornerstone</span> "
+                "(high production, low variance — the most reliable stars). "
+                "Top-right = <span style='color:#ef4444;font-weight:600;'>Star but Risky</span> "
+                "(high ceiling but unpredictable). Bottom-left = consistent depth pieces. "
+                "Top-left = volatile fringe players.<br><br>"
+                "<b>Standard Deviation (SD)</b> measures how spread out a player's year-to-year fWAR values are. "
+                "An SD of 0.5 means very consistent; SD of 2.0+ means huge swings between great and poor seasons. "
+                "<b>WSR</b> = average fWAR ÷ (1 + SD) — higher WSR means more reliable, bankable production."
+                "</div></div>",
+                unsafe_allow_html=True,
+            )
 
             _wsr_min_pa = st.slider("Min PA (hitters) / IP (pitchers)", 50, 300, 150,
                                      key="v2_war_stability_min_pa")
