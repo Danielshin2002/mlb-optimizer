@@ -17,3 +17,12 @@ gatherUsageStats = false
 
 [client]
 toolbarMode = "minimal"
+
+[cache]
+# Persistent disk cache for multi-user performance
+# Survives app restarts and reduces R2 bandwidth usage
+maxEntries = 1000
+ttlSeconds = 86400  # 24 hours
+
+[logger]
+level = "warning"

@@ -79,6 +79,48 @@ except ImportError:
 
 import io as _io
 import unicodedata as _unicodedata
+from pathlib import Path as _Path
+
+# ---------------------------------------------------------------------------
+# Persistent Disk Cache Management
+# ---------------------------------------------------------------------------
+_CACHE_DIR = os.path.expanduser("~/.mlb_toolbox_cache")
+_ETAG_METADATA_FILE = os.path.join(_CACHE_DIR, "etags.json")
+
+try:
+    _Path(_CACHE_DIR).mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass  # Cache directory creation optional
+
+
+def _init_etag_metadata() -> dict:
+    """Load or create the ETag metadata file."""
+    if os.path.exists(_ETAG_METADATA_FILE):
+        try:
+            with open(_ETAG_METADATA_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+
+def _save_etag_metadata(metadata: dict) -> None:
+    """Persist ETag metadata to disk."""
+    try:
+        with open(_ETAG_METADATA_FILE, "w") as f:
+            json.dump(metadata, f, indent=2)
+    except Exception:
+        pass  # Metadata save is optional
+
+
+def _compute_cache_key(url: str) -> str:
+    """Generate a deterministic cache filename from a URL."""
+    return hashlib.md5(url.encode()).hexdigest() + ".cached"
+
+
+def _get_cached_file_path(url: str) -> str:
+    """Return the disk path where a remote file should be cached."""
+    return os.path.join(_CACHE_DIR, _compute_cache_key(url))
 
 
 def _fix_player_name(s: str) -> str:
@@ -107,25 +149,110 @@ def _fix_player_col(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _read_csv(path: str, **kwargs) -> pd.DataFrame:
-    """Read a CSV from a local path or an R2 URL.
-
-    Uses ``requests`` for HTTP(S) URLs to avoid urllib 403 blocks from
-    Cloudflare, then hands the bytes to ``pd.read_csv``.
-    Automatically normalises the Player column if present.
+    """Read a CSV from a local path or an R2 URL with persistent disk caching & ETag support.
+    
+    For remote URLs:
+    1. Check if cached file exists on disk
+    2. If yes, verify with ETag to detect changes
+    3. If unchanged: use cached file (fast)
+    4. If changed or missing: download and cache
+    5. Automatically normalises the Player column if present
     """
     if path.startswith("http") and _requests_available:
-        resp = _requests.get(path, timeout=30)
-        resp.raise_for_status()
-        return _fix_player_col(pd.read_csv(_io.BytesIO(resp.content), **kwargs))
+        cache_file = _get_cached_file_path(path)
+        metadata = _init_etag_metadata()
+        cache_key = path
+        
+        # Try to use cached file if it exists
+        if os.path.exists(cache_file):
+            try:
+                # Check ETag with HEAD request to detect changes
+                cached_etag = metadata.get(cache_key, {}).get("etag")
+                if cached_etag:
+                    head_resp = _requests.head(path, timeout=30)
+                    current_etag = head_resp.headers.get("ETag", "")
+                    if current_etag and current_etag == cached_etag:
+                        # File unchanged—use cached version
+                        return _fix_player_col(pd.read_csv(cache_file, **kwargs))
+            except Exception:
+                # If HEAD check fails, fall back to using cached file anyway
+                try:
+                    return _fix_player_col(pd.read_csv(cache_file, **kwargs))
+                except Exception:
+                    pass  # Fall through to re-download
+        
+        # Download and cache
+        try:
+            resp = _requests.get(path, timeout=30)
+            resp.raise_for_status()
+            
+            # Save to cache
+            with open(cache_file, "wb") as f:
+                f.write(resp.content)
+            
+            # Update metadata with ETag
+            etag = resp.headers.get("ETag", "")
+            if etag:
+                metadata[cache_key] = {"etag": etag, "url": path}
+                _save_etag_metadata(metadata)
+            
+            return _fix_player_col(pd.read_csv(_io.BytesIO(resp.content), **kwargs))
+        except Exception as e:
+            # If download fails but cache exists, use stale cache
+            if os.path.exists(cache_file):
+                try:
+                    return _fix_player_col(pd.read_csv(cache_file, **kwargs))
+                except Exception:
+                    raise e
+            raise
+    
     return _fix_player_col(pd.read_csv(path, **kwargs))
 
 
 def _read_excel(path: str, **kwargs) -> pd.DataFrame:
-    """Read an Excel file from a local path or an R2 URL."""
+    """Read an Excel file from a local path or an R2 URL with persistent disk caching & ETag support."""
     if path.startswith("http") and _requests_available:
-        resp = _requests.get(path, timeout=30)
-        resp.raise_for_status()
-        return _fix_player_col(pd.read_excel(_io.BytesIO(resp.content), **kwargs))
+        cache_file = _get_cached_file_path(path)
+        metadata = _init_etag_metadata()
+        cache_key = path
+        
+        # Try to use cached file if it exists
+        if os.path.exists(cache_file):
+            try:
+                cached_etag = metadata.get(cache_key, {}).get("etag")
+                if cached_etag:
+                    head_resp = _requests.head(path, timeout=30)
+                    current_etag = head_resp.headers.get("ETag", "")
+                    if current_etag and current_etag == cached_etag:
+                        return _fix_player_col(pd.read_excel(cache_file, **kwargs))
+            except Exception:
+                try:
+                    return _fix_player_col(pd.read_excel(cache_file, **kwargs))
+                except Exception:
+                    pass
+        
+        # Download and cache
+        try:
+            resp = _requests.get(path, timeout=30)
+            resp.raise_for_status()
+            
+            with open(cache_file, "wb") as f:
+                f.write(resp.content)
+            
+            etag = resp.headers.get("ETag", "")
+            if etag:
+                metadata[cache_key] = {"etag": etag, "url": path}
+                _save_etag_metadata(metadata)
+            
+            return _fix_player_col(pd.read_excel(_io.BytesIO(resp.content), **kwargs))
+        except Exception as e:
+            if os.path.exists(cache_file):
+                try:
+                    return _fix_player_col(pd.read_excel(cache_file, **kwargs))
+                except Exception:
+                    raise e
+            raise
+    
     return _fix_player_col(pd.read_excel(path, **kwargs))
 
 
@@ -239,8 +366,30 @@ def _resolve_data_path(raw_path: str, config_path: str) -> str:
 
 
 def _file_hash(path: str) -> str:
+    """Generate a cache key for a file path or R2 URL.
+    
+    For remote files: uses ETag if available, otherwise returns URL hash
+    For local files: computes MD5 of file content
+    """
     if path.startswith("http"):
-        return "r2-remote"   # remote files cached for the session lifetime
+        metadata = _init_etag_metadata()
+        cached_data = metadata.get(path, {})
+        if "etag" in cached_data:
+            return cached_data["etag"]  # Use ETag as cache key
+        # Try to fetch ETag if we don't have it cached
+        try:
+            head_resp = _requests.head(path, timeout=10)
+            etag = head_resp.headers.get("ETag", "")
+            if etag:
+                metadata[path] = {"etag": etag, "url": path}
+                _save_etag_metadata(metadata)
+                return etag
+        except Exception:
+            pass
+        # Fallback: return URL hash
+        return hashlib.md5(path.encode()).hexdigest()[:16]
+    
+    # Local file: compute MD5
     try:
         h = hashlib.md5()
         with open(path, "rb") as fh:
@@ -252,9 +401,13 @@ def _file_hash(path: str) -> str:
 
 
 def _dir_hash(dir_path: str) -> str:
-    """Cheap cache key for a directory — hashes the sorted file listing."""
+    """Cheap cache key for a directory — hashes the sorted file listing.
+    
+    For remote directories on R2: returns a stable identifier
+    For local directories: hashes the file listing
+    """
     if dir_path.startswith("http"):
-        return "r2-remote"   # remote directories; cache lasts for session
+        return hashlib.md5(dir_path.encode()).hexdigest()[:16]  # Stable hash for R2 directory
     try:
         return hashlib.md5("|".join(sorted(os.listdir(dir_path))).encode()).hexdigest()[:16]
     except Exception:
@@ -530,7 +683,7 @@ def _roster_grade(roster_df: pd.DataFrame) -> dict:
 # Cache functions
 # ---------------------------------------------------------------------------
 
-@st.cache_data(show_spinner="Loading & projecting player data ...")
+@st.cache_data(show_spinner="Loading & projecting player data ...", persist="disk")
 def _cached_projections(salary_path: str, file_hash: str, proj_weights_json: str,
                          season: int, clip_neg: bool, min_war: float, max_yrs: int):
     cfg = {
@@ -544,7 +697,7 @@ def _cached_projections(salary_path: str, file_hash: str, proj_weights_json: str
     return make_projections(raw_df, cfg), raw_df
 
 
-@st.cache_data(show_spinner="Building archetypes ...")
+@st.cache_data(show_spinner="Building archetypes ...", persist="disk")
 def _cached_archetypes(proj_hash: str, proj_json: str):
     proj_df = pd.read_json(proj_json, orient="records")
     proj_df["eligible_slots"] = proj_df["eligible_slots"].apply(
@@ -555,14 +708,14 @@ def _cached_archetypes(proj_hash: str, proj_json: str):
     return arch_df, proj_with_arch
 
 
-@st.cache_data(show_spinner="Loading wins data ...")
+@st.cache_data(show_spinner="Loading wins data ...", persist="disk")
 def _cached_wins(wins_path: str, file_hash: str):
     if not os.path.exists(wins_path):
         return pd.DataFrame()
     return _read_csv(wins_path, low_memory=False)
 
 
-@st.cache_data(show_spinner="Loading team payroll history ...")
+@st.cache_data(show_spinner="Loading team payroll history ...", persist="disk")
 def _cached_payroll_history(data_dir: str):
     return get_team_payroll_history(data_dir)
 
@@ -598,7 +751,7 @@ def _cached_team_scenario(
     )
 
 
-@st.cache_data(show_spinner="Loading player database ...")
+@st.cache_data(show_spinner="Loading player database ...", persist="disk")
 def _cached_simulator_data(combined_path: str, ind_2025_path: str, file_hash: str) -> pd.DataFrame:
     """Load and merge 2025 combined data with 2025 individual contract columns."""
     comb = _read_csv(combined_path, low_memory=False)
@@ -769,7 +922,7 @@ def _cached_simulator_data(combined_path: str, ind_2025_path: str, file_hash: st
     return comb2025
 
 
-@st.cache_data(show_spinner="Loading 2026 payroll data ...")
+@st.cache_data(show_spinner="Loading 2026 payroll data ...", persist="disk")
 def _cached_2026_payroll(payroll_dir: str, combined_path: str, dir_hash: str) -> pd.DataFrame:
     """Consolidate all 30-team 2026 payroll xlsx files into a single DataFrame.
 
