@@ -434,10 +434,10 @@ def _render_glossary(
             with _gcols[i % cols]:
                 st.markdown(
                     f"<div style='background:#0d1e35;border-left:3px solid #2b5cc8;"
-                    f"border-radius:0 8px 8px 0;padding:0.45rem 0.8rem;margin-bottom:0.4rem;'>"
-                    f"<span style='font-size:0.73rem;font-weight:700;color:#93c5fd;'>{abbr}</span>"
-                    f"<span style='font-size:0.70rem;color:#7a9ebc;'> — {fullname}</span>"
-                    f"<div style='font-size:0.64rem;color:#4a687e;margin-top:0.15rem;'>{desc}</div>"
+                    f"border-radius:0 8px 8px 0;padding:0.5rem 0.85rem;margin-bottom:0.45rem;'>"
+                    f"<span style='font-size:0.8rem;font-weight:700;color:#93c5fd;'>{abbr}</span>"
+                    f"<span style='font-size:0.76rem;color:#93b8d8;'> — {fullname}</span>"
+                    f"<div style='font-size:0.72rem;color:#7a9ebc;margin-top:0.15rem;line-height:1.5;'>{desc}</div>"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
@@ -1460,8 +1460,17 @@ footer { display: none !important; }
 /* ── Caption / markdown ───────────────────────────────────────────── */
 [data-testid="stCaptionContainer"] p,
 [data-testid="stCaption"] {
-  color: #4a687e !important;
-  font-size: 0.72rem !important;
+  color: #7a9ebc !important;
+  font-size: 0.78rem !important;
+}
+/* ── General paragraph / body text brighter ──────────────────────── */
+.stApp p, .stApp span, .stApp label, .stApp div {
+  color: inherit;
+}
+[data-testid="stMarkdownContainer"] p {
+  color: #93b8d8 !important;
+  font-size: 0.84rem !important;
+  line-height: 1.6 !important;
 }
 h1,h2,h3,h4,h5,h6 { color: #d6e8f8 !important; }
 
