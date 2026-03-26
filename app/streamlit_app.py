@@ -1595,7 +1595,7 @@ footer { display: none !important; }
   border-radius: 8px !important;
   overflow: hidden !important;
 }
-/* Header row */
+/* Header row — centered */
 [data-testid="stDataFrame"]    .dvn-scroller thead th,
 [data-testid="stDataEditor"]   .dvn-scroller thead th {
   background: #1d2f47 !important;
@@ -1603,6 +1603,12 @@ footer { display: none !important; }
   font-size: 0.72rem !important;
   font-weight: 600 !important;
   border-bottom: 1px solid #253d58 !important;
+  text-align: center !important;
+}
+/* All cells — centered */
+[data-testid="stDataFrame"]    .dvn-scroller tbody td,
+[data-testid="stDataEditor"]   .dvn-scroller tbody td {
+  text-align: center !important;
 }
 /* Cell hover */
 [data-testid="stDataFrame"]    .dvn-scroller tbody tr:hover td,
@@ -8436,38 +8442,40 @@ def _render_team_analysis_page():
     else:
         _eff_rank = _war_rank = _pay_rank = 0
 
+    _dpw = round(_payroll_m / max(_war, 0.1), 1)
+
     st.markdown(
         f"<div style='background:linear-gradient(135deg,#0f2035,#0d1b2a);border:1px solid #1e3a5c;"
         f"border-radius:10px;padding:16px 20px;margin-bottom:14px;'>"
         f"<div style='font-size:1.4rem;font-weight:800;color:#e8f4ff;margin-bottom:8px;'>"
-        f"🏟️ {_full_name}</div>"
+        f"{_full_name}</div>"
         f"<div style='display:flex;flex-wrap:wrap;gap:12px;'>"
         f"<div style='background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;'>"
         f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>2025 Record</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_wins}W</div></div>"
         f"<div style='background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;'>"
+        f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>2026 Record</div>"
+        f"<div style='font-size:1.2rem;font-weight:700;color:#4a687e;'>—</div></div>"
+        f"<div style='background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;'>"
         f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>2026 Payroll</div>"
-        f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>${_payroll_m:.0f}M</div></div>"
+        f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>${_payroll_m:.0f}M</div>"
+        f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_pay_rank}/30</div></div>"
         f"<div style='background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;'>"
         f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>Team fWAR</div>"
-        f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_war:.1f}</div></div>"
+        f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_war:.1f}</div>"
+        f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_war_rank}/30</div></div>"
         f"<div style='background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;'>"
-        f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>Efficiency Gap</div>"
+        f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>Efficiency</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:{'#22c55e' if _gap < 0 else '#ef4444'};'>"
-        f"{'$' + str(int(_gap)) + 'M' if _gap <= 0 else '+$' + str(int(_gap)) + 'M'}</div></div>"
+        f"{'$' + str(int(_gap)) + 'M' if _gap <= 0 else '+$' + str(int(_gap)) + 'M'}</div>"
+        f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_eff_rank}/30</div></div>"
         f"<div style='background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;'>"
-        f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>Postseason</div>"
-        f"<div style='font-size:1.2rem;font-weight:700;color:{'#22c55e' if _playoff else '#4a687e'};'>"
-        f"{'✓ Yes' if _playoff else '✗ No'}</div></div>"
+        f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>$/fWAR</div>"
+        f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>${_dpw:.1f}M</div></div>"
         f"<div style='background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;'>"
         f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>40-Man Roster</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{n_active} <span style='font-size:0.7rem;color:#7a9ebc;'>active</span>"
         f" · {n_il} <span style='font-size:0.7rem;color:#ef4444;'>IL</span></div></div>"
-        f"</div>"
-        f"<div style='display:flex;gap:16px;margin-top:10px;font-size:0.78rem;color:#7a9ebc;'>"
-        f"<span>Efficiency Rank: <b style='color:#d6e8f8;'>#{_eff_rank}/30</b></span>"
-        f"<span>fWAR Rank: <b style='color:#d6e8f8;'>#{_war_rank}/30</b></span>"
-        f"<span>Payroll Rank: <b style='color:#d6e8f8;'>#{_pay_rank}/30</b></span>"
         f"</div></div>",
         unsafe_allow_html=True,
     )
@@ -8475,50 +8483,63 @@ def _render_team_analysis_page():
     # ══════════════════════════════════════════════════════════════════════
     # TABS
     # ══════════════════════════════════════════════════════════════════════
-    tt1, tt2, tt3, tt4 = st.tabs(["📋 Roster", "📊 Rankings", "💰 Salary & Payroll", "📈 History"])
+    tt1, tt2, tt3, tt4, tt5 = st.tabs(["📋 Roster", "📊 Rankings", "💰 Salary & Payroll", "📈 Payroll Efficiency", "📉 History"])
 
     # ── Tab 1 — Roster ───────────────────────────────────────────────────
     with tt1:
         if not team_roster.empty:
-            # Split active vs IL
-            _active = team_roster[team_roster["status"] == "Active"].copy()
-            _injured = team_roster[team_roster["status"] != "Active"].copy()
-
-            # Merge with payroll data for salary/WAR
+            # Merge ALL roster players with payroll data
+            _merged = team_roster.copy()
             if not team_pay.empty:
-                _merge_cols = ["Player", "Position", "Salary_M", "WAR_Total", "Stage_Clean", "Age"]
-                _merge_cols = [c for c in _merge_cols if c in team_pay.columns]
+                _merge_cols = [c for c in ["Player", "Salary_M", "WAR_Total", "Stage_Clean", "Age",
+                               "W_per_M", "PPR", "HR", "AVG", "ERA", "IP"] if c in team_pay.columns]
                 _pay_lookup = team_pay[_merge_cols].copy()
                 _pay_lookup["_key"] = _pay_lookup["Player"].str.lower().str.strip()
-                _active["_key"] = _active["full_name"].str.lower().str.strip()
-                _active = _active.merge(_pay_lookup, on="_key", how="left")
-                _injured["_key"] = _injured["full_name"].str.lower().str.strip()
-                _injured = _injured.merge(_pay_lookup, on="_key", how="left")
+                _merged["_key"] = _merged["full_name"].str.lower().str.strip()
+                _merged = _merged.merge(_pay_lookup, on="_key", how="left")
 
-            st.markdown(f"##### Active Roster ({len(_active)} players)")
-            _act_show = _active[["full_name", "position", "jersey_number"]].copy()
-            if "Salary_M" in _active.columns:
-                _act_show["Salary $M"] = _active["Salary_M"].round(1)
-            if "WAR_Total" in _active.columns:
-                _act_show["fWAR"] = _active["WAR_Total"].round(1)
-            if "Stage_Clean" in _active.columns:
-                _act_show["Stage"] = _active["Stage_Clean"]
-            _act_show.columns = [c.replace("full_name", "Player").replace("position", "Pos").replace("jersey_number", "#") for c in _act_show.columns]
-            st.dataframe(_act_show, hide_index=True, use_container_width=True,
-                         height=min(60 + len(_act_show) * 35, 600))
+            # Build display table
+            _rtbl = pd.DataFrame()
+            _rtbl["Player"] = _merged["full_name"]
+            _rtbl["Pos"] = _merged["position"]
+            _rtbl["Status"] = _merged["status"].apply(lambda s: "60-Day IL" if "Injured" in str(s) else "Active")
+            _rtbl["Stage"] = _merged.get("Stage_Clean", pd.Series(["—"] * len(_merged)))
+            _rtbl["Age"] = _merged.get("Age", pd.Series([None] * len(_merged)))
+            _rtbl["Salary $M"] = _merged.get("Salary_M", pd.Series([0.74] * len(_merged))).fillna(0.74)
+            _rtbl["fWAR"] = _merged.get("WAR_Total", pd.Series([None] * len(_merged)))
+            _rtbl["fWAR/$M"] = (_rtbl["fWAR"].fillna(0) / _rtbl["Salary $M"].clip(lower=0.01)).round(2)
+            _rtbl = _rtbl.sort_values("fWAR/$M", ascending=False).reset_index(drop=True)
+            _rtbl.insert(0, "#", range(1, len(_rtbl) + 1))
 
-            if not _injured.empty:
-                st.markdown(
-                    f"##### 🏥 Injured List ({len(_injured)} players)",
-                )
-                _il_show = _injured[["full_name", "position", "status"]].copy()
-                if "Salary_M" in _injured.columns:
-                    _il_show["Salary $M"] = _injured["Salary_M"].round(1)
-                if "WAR_Total" in _injured.columns:
-                    _il_show["fWAR"] = _injured["WAR_Total"].round(1)
-                _il_show.columns = [c.replace("full_name", "Player").replace("position", "Pos") for c in _il_show.columns]
-                st.dataframe(_il_show, hide_index=True, use_container_width=True,
-                             height=min(60 + len(_il_show) * 35, 300))
+            # Stage color coding
+            _STG_CLR = {"Pre-Arb": "#14532d", "Arb": "#2d1f0c", "FA": "#0c1a2d"}
+            def _stage_clr(row):
+                stg = str(row.get("Stage", ""))
+                bg = _STG_CLR.get(stg, "")
+                if row.get("Status") == "60-Day IL":
+                    return [f"background-color:#2d0c0c;color:#fca5a5"] * len(row)
+                if bg:
+                    return [f"background-color:{bg}66"] * len(row)
+                return [""] * len(row)
+
+            st.markdown(f"##### Active Roster ({len(_rtbl[_rtbl['Status'] == 'Active'])} players, "
+                        f"{len(_rtbl[_rtbl['Status'] != 'Active'])} on IL)")
+            st.markdown(
+                "<div style='font-size:0.78rem;color:#7a9ebc;margin-bottom:0.4rem;'>"
+                "Ranked by fWAR per $M (most efficient first). Color: "
+                "<span style='color:#22c55e;'>Pre-Arb</span> · "
+                "<span style='color:#f59e0b;'>Arb</span> · "
+                "<span style='color:#3b82f6;'>FA</span> · "
+                "<span style='color:#fca5a5;'>IL</span></div>",
+                unsafe_allow_html=True,
+            )
+            st.dataframe(
+                _rtbl.style.apply(_stage_clr, axis=1).format({
+                    "Age": "{:.0f}", "Salary $M": "{:.1f}", "fWAR": "{:.1f}", "fWAR/$M": "{:.2f}",
+                }, na_rep="—"),
+                hide_index=True, use_container_width=True,
+                height=min(60 + len(_rtbl) * 35, 700),
+            )
         else:
             st.info(f"No 40-man roster data available for {sel_team}.")
 
@@ -8651,8 +8672,88 @@ def _render_team_analysis_page():
         else:
             st.info(f"No 2026 payroll data available for {sel_team}.")
 
-    # ── Tab 4 — Historical Trends ────────────────────────────────────────
+    # ── Tab 4 — Payroll Efficiency (player-level scatter for this team) ──
     with tt4:
+        st.markdown(
+            "<div style='font-size:0.85rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
+            "Player-level fWAR vs Salary for this team's roster. Dots below the orange market "
+            "line are underpaid (good value). Dots above are overpaid relative to production.</div>",
+            unsafe_allow_html=True,
+        )
+        if not team_pay.empty and "WAR_Total" in team_pay.columns and "Salary_M" in team_pay.columns:
+            _tp_plot = team_pay.dropna(subset=["WAR_Total", "Salary_M"]).copy()
+            if len(_tp_plot) >= 3:
+                _stg_clrs = {"FA": "#3b82f6", "Arb": "#f59e0b", "Pre-Arb": "#22c55e"}
+                _tp_colors = [_stg_clrs.get(s, "#4a687e") for s in _tp_plot.get("Stage_Clean", [])]
+                _tp_hover = _tp_plot.apply(lambda r: (
+                    f"<b>{r['Player']}</b><br>"
+                    + f"fWAR: {r['WAR_Total']:.1f} · Salary: ${r['Salary_M']:.1f}M<br>"
+                    + f"Stage: {r.get('Stage_Clean', '—')}"
+                ), axis=1)
+
+                fig_eff = go.Figure()
+                for stg, clr in _stg_clrs.items():
+                    mask = _tp_plot["Stage_Clean"] == stg
+                    if mask.any():
+                        fig_eff.add_trace(go.Scatter(
+                            x=_tp_plot.loc[mask, "WAR_Total"],
+                            y=_tp_plot.loc[mask, "Salary_M"],
+                            mode="markers+text",
+                            text=_tp_plot.loc[mask, "Player"],
+                            textposition="top center",
+                            textfont=dict(size=8, color="#7aa2c0"),
+                            marker=dict(color=clr, size=9, opacity=0.9),
+                            name=stg,
+                            hovertemplate="%{text}<br>fWAR: %{x:.1f} · $%{y:.1f}M<extra></extra>",
+                        ))
+
+                # Market line (simple linear fit)
+                _xv = _tp_plot["WAR_Total"].values
+                _yv = _tp_plot["Salary_M"].values
+                try:
+                    _cf = np.polyfit(_xv, _yv, 1)
+                    _xl = np.linspace(max(_xv.min(), -1), _xv.max(), 50)
+                    fig_eff.add_trace(go.Scatter(
+                        x=_xl, y=np.polyval(_cf, _xl), mode="lines",
+                        line=dict(color="#f4a261", dash="dash", width=2),
+                        name="Team market line", showlegend=True,
+                    ))
+                except Exception:
+                    pass
+
+                fig_eff.update_layout(**_pt(
+                    title=f"{_full_name} — Player fWAR vs Salary",
+                    xaxis=dict(title="fWAR (2025)"), yaxis=dict(title="2026 Salary ($M)"),
+                    height=500, showlegend=True,
+                    legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
+                    hoverlabel=dict(bgcolor="#0d1f38", bordercolor="#1e3a5f",
+                                    font=dict(color="#dbeafe", size=12)),
+                ))
+                st.plotly_chart(fig_eff, use_container_width=True, config={"displayModeBar": False})
+
+                # Top value / worst value mini-tables
+                _vc1, _vc2 = st.columns(2)
+                with _vc1:
+                    st.markdown("##### Best Value Players")
+                    _bv = _tp_plot.copy()
+                    _bv["fWAR/$M"] = (_bv["WAR_Total"] / _bv["Salary_M"].clip(lower=0.01)).round(2)
+                    _bv_top = _bv.nlargest(5, "fWAR/$M")[["Player", "WAR_Total", "Salary_M", "fWAR/$M", "Stage_Clean"]].copy()
+                    _bv_top.columns = ["Player", "fWAR", "Salary $M", "fWAR/$M", "Stage"]
+                    st.dataframe(_bv_top.style.format({"fWAR": "{:.1f}", "Salary $M": "{:.1f}", "fWAR/$M": "{:.2f}"}, na_rep="—"),
+                                 hide_index=True, use_container_width=True)
+                with _vc2:
+                    st.markdown("##### Most Overpaid Players")
+                    _ov_top = _bv.nsmallest(5, "fWAR/$M")[["Player", "WAR_Total", "Salary_M", "fWAR/$M", "Stage_Clean"]].copy()
+                    _ov_top.columns = ["Player", "fWAR", "Salary $M", "fWAR/$M", "Stage"]
+                    st.dataframe(_ov_top.style.format({"fWAR": "{:.1f}", "Salary $M": "{:.1f}", "fWAR/$M": "{:.2f}"}, na_rep="—"),
+                                 hide_index=True, use_container_width=True)
+            else:
+                st.info("Not enough player data for efficiency scatter.")
+        else:
+            st.info(f"No payroll data available for {sel_team}.")
+
+    # ── Tab 5 — Historical Trends ────────────────────────────────────────
+    with tt5:
         if not team_eff.empty and len(team_eff) >= 2:
             st.markdown(
                 "<div style='font-size:0.85rem;color:#93b8d8;margin-bottom:0.8rem;'>"
