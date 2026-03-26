@@ -5794,12 +5794,25 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                     st.text(f"Method: Polynomial (deg 2)\n"
                             f"Coefficients (highest→lowest): {[f'{c:.4f}' for c in _coeffs]}")
 
-            with st.expander("Top 5 most underpaid players"):
-                _top5 = df.nsmallest(5, "PPR")[["Player","Team","Year","WAR_Total","Salary_M","predicted","PPR"]]
-                st.dataframe(_top5.style.format({
-                    "WAR_Total": "{:.1f}", "Salary_M": "${:.2f}M",
-                    "predicted": "${:.2f}M", "PPR": "{:.3f}",
-                }), hide_index=True, use_container_width=True)
+            # ── Top 25 Most Underpaid Players (auto-adjusts with filters) ──
+            st.markdown(
+                "<div style='margin-top:1rem;font-size:0.92rem;font-weight:700;color:#d6e8f8;'>"
+                "Top 25 Most Underpaid Players</div>"
+                "<div style='font-size:0.76rem;color:#7a9ebc;margin-bottom:0.4rem;'>"
+                "Ranked by PPR (lowest = most underpaid). Adjusts with all filters above.</div>",
+                unsafe_allow_html=True,
+            )
+            _top25 = df.nsmallest(25, "PPR")[["Player","Team","Year","WAR_Total","Salary_M","predicted","PPR","Stage_Clean"]].copy()
+            _top25.insert(0, "#", range(1, len(_top25) + 1))
+            _top25.columns = ["#", "Player", "Team", "Year", "fWAR", "Salary $M", "Expected $M", "PPR", "Stage"]
+            _top25["Year"] = _top25["Year"].astype(int)
+            st.dataframe(
+                _top25.style.format({
+                    "fWAR": "{:.1f}", "Salary $M": "{:.1f}",
+                    "Expected $M": "{:.1f}", "PPR": "{:.3f}",
+                }).apply(lambda row: ["background-color:#0c221866"] * len(row) if row["#"] <= 5 else [""] * len(row), axis=1),
+                hide_index=True, use_container_width=True, height=min(60 + 25 * 35, 720),
+            )
 
         # ── Tab 3 — Age Trajectory ────────────────────────────────────────
         with t3:
@@ -5851,6 +5864,29 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                 height=640, showlegend=True,
             ))
             st.plotly_chart(fig2, use_container_width=True)
+
+            # ── Top 25 Standouts by age efficiency ──────────────────────
+            st.markdown(
+                "<div style='margin-top:1rem;font-size:0.92rem;font-weight:700;color:#d6e8f8;'>"
+                "Top 25 Standouts — Best Value by Age</div>"
+                "<div style='font-size:0.76rem;color:#7a9ebc;margin-bottom:0.4rem;'>"
+                "Highest fWAR per $M among filtered players. Adjusts with all filters above.</div>",
+                unsafe_allow_html=True,
+            )
+            _age_eff = df.copy()
+            _age_eff["fWAR/$M"] = _age_eff["WAR_Total"] / _age_eff["Salary_M"].clip(lower=0.01)
+            _age_top = _age_eff.nlargest(25, "fWAR/$M")[["Player","Team","Year","Age","WAR_Total","Salary_M","Stage_Clean"]].copy()
+            _age_top["fWAR/$M"] = (_age_top["WAR_Total"] / _age_top["Salary_M"].clip(lower=0.01)).round(2)
+            _age_top.insert(0, "#", range(1, len(_age_top) + 1))
+            _age_top.columns = ["#", "Player", "Team", "Year", "Age", "fWAR", "Salary $M", "Stage", "fWAR/$M"]
+            _age_top["Year"] = _age_top["Year"].astype(int)
+            _age_top["Age"] = _age_top["Age"].round(0).astype(int)
+            st.dataframe(
+                _age_top.style.format({
+                    "fWAR": "{:.1f}", "Salary $M": "{:.1f}", "fWAR/$M": "{:.2f}",
+                }).apply(lambda row: ["background-color:#0c221866"] * len(row) if row["#"] <= 5 else [""] * len(row), axis=1),
+                hide_index=True, use_container_width=True, height=min(60 + 25 * 35, 720),
+            )
 
         # ── Tab 4 — By Team ───────────────────────────────────────────────
         with t4:
