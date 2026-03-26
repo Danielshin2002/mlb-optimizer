@@ -2814,17 +2814,27 @@ def _render_best_fits(roster_df: pd.DataFrame, budget_M: float) -> None:
 
     avail["_score"] = avail["WAR_Total"].fillna(0) / avail["Salary_M"].clip(lower=0.1)
 
-    # Acquisition type: FAs can be signed; Arb/Pre-Arb require a trade
-    if "Stage_Clean" in avail.columns:
-        avail["Acquisition"] = avail["Stage_Clean"].apply(
-            lambda s: "Sign (FA)" if s == "FA" else "Trade Required"
-        )
+    # Acquisition type: check 40-man roster CSV for actual roster membership
+    _roster_40_bf = st.session_state.get("_sim_roster_40", pd.DataFrame())
+    _rostered_set = set()
+    _rostered_teams: dict = {}
+    if not _roster_40_bf.empty and "full_name" in _roster_40_bf.columns:
+        _rostered_set = set(_roster_40_bf["full_name"].str.lower().str.strip())
+        _rostered_teams = dict(zip(
+            _roster_40_bf["full_name"].str.lower().str.strip(),
+            _roster_40_bf["team"],
+        ))
+    avail["_is_rostered"] = avail["Player"].str.lower().str.strip().isin(_rostered_set)
+    avail["Curr. Team"] = avail["Player"].str.lower().str.strip().map(_rostered_teams).fillna("")
+    avail["Acquisition"] = avail["_is_rostered"].map({True: "Trade Required", False: "Free Agent"})
+    # Free agents rank slightly higher at equal WAR (more accessible)
+    avail["_adj_score"] = avail["_score"] * np.where(avail["_is_rostered"], 1.0, 1.2)
 
-    _show_cols = ["Player", "Team", "Position", "Stage_Clean", "Age", "WAR_Total", "Salary_M", "_score", "Acquisition"]
+    _show_cols = ["Player", "Curr. Team", "Position", "Stage_Clean", "Age", "WAR_Total", "Salary_M", "_score", "Acquisition"]
     _show_cols = [c for c in _show_cols if c in avail.columns]
 
     _fmt = {"WAR_Total": "{:.1f}", "Salary_M": "${:.1f}M", "_score": "{:.2f}", "Age": "{:.0f}"}
-    _rename = {"WAR_Total": "WAR", "Salary_M": "Sal $M", "_score": "W/$M", "Stage_Clean": "Stage"}
+    _rename = {"WAR_Total": "fWAR", "Salary_M": "Sal $M", "_score": "fWAR/$M", "Stage_Clean": "Stage"}
 
     fit_t1, fit_t2, fit_t3 = st.tabs(["Best Value Adds", "Fill Open Positions", "Best Group Fit"])
 
@@ -2835,7 +2845,7 @@ def _render_best_fits(roster_df: pd.DataFrame, budget_M: float) -> None:
             "red = below league avg. Excludes players already on your roster."
         )
         _top = (
-            avail.sort_values("_score", ascending=False)
+            avail.sort_values("_adj_score", ascending=False)
                  .head(20)[_show_cols]
                  .rename(columns=_rename)
                  .reset_index(drop=True)
@@ -3110,6 +3120,7 @@ def _render_simulator_page():
     # ── Load 40-man roster CSV ──────────────────────────────────────────────
     _roster_40_path = _data_url("data/40man_rosters_2025.csv")
     _roster_40 = _cached_40man_roster(_roster_40_path, _file_hash(_roster_40_path))
+    st.session_state["_sim_roster_40"] = _roster_40
 
     df = df.copy()
     if "WAR_Total" in df.columns and "pos_group" in df.columns:
@@ -3191,8 +3202,10 @@ def _render_simulator_page():
         with oc1:
             load_team = st.selectbox("Team", all_teams, key="sim_load_team")
         with oc2:
+            if "sim_budget_input" not in st.session_state:
+                st.session_state["sim_budget_input"] = 130
             budget_M = st.number_input(
-                "Budget $M", min_value=50, max_value=350, value=130, step=5,
+                "Budget $M", min_value=50, max_value=350, step=5,
                 key="sim_budget_input",
             )
             # CBT tier indicator
@@ -3264,6 +3277,9 @@ def _render_simulator_page():
                             "_dc_only":    True,
                         }
                         _unmatched_names.append(_nm)
+                    # Add status from 40-man CSV
+                    _rec["_40man_status"] = str(_r.get("status", "Active"))
+                    _rec["on_40man"] = True
                     _rows.append(_rec)
                 _tp = pd.DataFrame(_rows)
                 # Store debug info for the debug expander
@@ -3305,6 +3321,35 @@ def _render_simulator_page():
                 st.markdown("**Unmatched player names:**")
                 for _un in _dbg["unmatched_names"]:
                     st.markdown(f"- {_un}")
+
+    # ── Fix 5 — Roster Status Explainer ───────────────────────────────────────
+    _render_glossary([
+        ("40-Man Roster", "40-Man Roster",
+         "The full group of players under MLB contract with a team. Includes the active 26-man roster, "
+         "injured list players, and optioned minor leaguers. Teams have 40 slots — adding a player beyond "
+         "40 requires removing someone first."),
+        ("26-Man Roster", "Active Roster",
+         "The 26 players eligible to play in any given game. Managers choose their lineup from this group. "
+         "Expands to 28 in September."),
+        ("60-Day IL", "60-Day Injured List",
+         "Players sidelined for at least 60 days. They do NOT count against the active 26-man roster but "
+         "still occupy a 40-man spot. Teams use this to free active roster space for healthy players."),
+        ("15-Day IL", "15-Day Injured List",
+         "Short-term injury designation. Player is out at least 15 days but retains their 40-man spot. "
+         "Common for minor injuries. Frees one active roster space."),
+        ("Option", "Optional Assignment",
+         "A 40-man player sent to the minor leagues. Still occupies a 40-man spot but frees an active roster "
+         "space. Players can be optioned up to 3 times before requiring waivers to move down."),
+        ("DFA", "Designated for Assignment",
+         "Team removes a player from the 40-man roster. Player has 10 days to be traded, claimed on waivers, "
+         "or released. Used to clear 40-man space for new additions."),
+        ("Service Time", "MLB Service Time",
+         "Days accrued on the active roster. 172 days = 1 full service year. Determines arb eligibility "
+         "(3 years), free agency (6 years), and Super Two status (~2.17 years)."),
+        ("Trade Required", "Trade Required Acquisition",
+         "This player is on another team's 40-man roster. Adding them to your custom roster would require "
+         "a trade in real life. Players not on any 40-man roster can be signed directly as free agents."),
+    ], title="📋 Understanding Roster Rules & Status", cols=2)
 
     # ── Filters ───────────────────────────────────────────────────────────────
     # Detect handedness columns (Bats for hitters, Throws for pitchers)
@@ -3437,7 +3482,15 @@ def _render_simulator_page():
         display_df["Added"] = display_df["Player"].apply(
             lambda p: "✓" if p in _on_roster_names else ""
         )
-        show_cols_with_added = ["Added"] + show_cols
+        # Show 40-man roster membership (current team or blank for true FAs)
+        _r40_team_map = {}
+        if not _roster_40.empty and "full_name" in _roster_40.columns:
+            _r40_team_map = dict(zip(
+                _roster_40["full_name"].str.lower().str.strip(),
+                _roster_40["team"],
+            ))
+        display_df["40-Man"] = display_df["Player"].str.lower().str.strip().map(_r40_team_map).fillna("")
+        show_cols_with_added = ["Added"] + show_cols + ["40-Man"]
 
         col_cfg: dict = {
             "Added":      st.column_config.TextColumn("✓",       width=30),
@@ -3458,6 +3511,8 @@ def _render_simulator_page():
             "WSR":        st.column_config.NumberColumn("WSR", format="%.2f", width="small",
                           help="WAR Stability Rating: mean WAR / (1 + std WAR). Higher = more consistent production. "
                                "Elite ≥ 3.5, Reliable ≥ 2.0, Volatile ≥ 1.0, Unstable < 1.0."),
+            "40-Man":     st.column_config.TextColumn("40-Man", width="small",
+                          help="Current 40-man roster team. Blank = free agent (can be signed directly)."),
         }
         for _st in hitter_ext[:2] + pitch_ext[:1]:
             if _st in ("AVG", "OBP"):
@@ -3665,9 +3720,11 @@ def _render_simulator_page():
 
                 # ── CBT Threshold Planner ────────────────────────────────
                 st.markdown("<hr class='sim-divider'>", unsafe_allow_html=True)
+                if "sim_cbt_adj" not in st.session_state:
+                    st.session_state["sim_cbt_adj"] = 0
                 _cbt_adj = st.slider(
                     "Luxury Tax Threshold Adjustment ($M)",
-                    min_value=-20, max_value=20, value=0, step=1,
+                    min_value=-20, max_value=20, step=1,
                     key="sim_cbt_adj",
                     help=(
                         "Shift the CBT base threshold ($244M for 2026) to model different "
@@ -3760,6 +3817,83 @@ def _render_simulator_page():
                         ))
                         st.plotly_chart(_fig2, use_container_width=True,
                                         config={"displayModeBar": False})
+                # ── Fix 6 — Future Payroll Commitments ────────────────────
+                if n_rostered >= 5:
+                    st.markdown("<hr class='sim-divider'>", unsafe_allow_html=True)
+                    st.markdown("##### 📅 Future Payroll Commitments")
+
+                    _fut_rows = []
+                    for _, _fp in roster_df.iterrows():
+                        _pn  = _fp.get("Player", "?")
+                        _sal = float(_fp.get("Salary_M") or 0.74)
+                        _stg = str(_fp.get("Stage_Clean", ""))
+                        _age = int(_fp["Age"]) if pd.notna(_fp.get("Age")) else 28
+                        # 2027/2028 from payroll data if available
+                        _s27 = float(_fp["2027"]) if pd.notna(_fp.get("2027")) and float(_fp.get("2027") or 0) > 0 else None
+                        _s28 = float(_fp["2028"]) if pd.notna(_fp.get("2028")) and float(_fp.get("2028") or 0) > 0 else None
+                        # Estimate if not available
+                        if _s27 is None:
+                            if _stg == "Pre-Arb":
+                                _s27 = 0.74
+                            elif _stg == "Arb":
+                                _s27 = round(_sal * 1.25, 1)
+                            else:
+                                _s27 = None  # FA — unknown
+                        if _s28 is None:
+                            if _stg == "Pre-Arb":
+                                _s28 = round(max(2.0, _sal * 3), 1)  # enters arb
+                            elif _stg == "Arb":
+                                _s28 = round(_sal * 1.5, 1)
+                            else:
+                                _s28 = None
+                        _fut_rows.append({"Player": _pn, "Stage": _stg,
+                                          "2026": _sal, "2027": _s27, "2028": _s28})
+
+                    _fut_df = pd.DataFrame(_fut_rows)
+
+                    # Stacked bar chart by stage
+                    _stg_colors = {"Pre-Arb": "#22c55e", "Arb": "#f59e0b", "FA": "#3b82f6"}
+                    _years_lbl = ["2026", "2027", "2028"]
+                    _fig_fut = go.Figure()
+                    for stg, clr in _stg_colors.items():
+                        _stg_sub = _fut_df[_fut_df["Stage"] == stg]
+                        vals = [float(_stg_sub[yr].dropna().sum()) for yr in _years_lbl]
+                        _fig_fut.add_trace(go.Bar(
+                            x=_years_lbl, y=vals, name=stg,
+                            marker_color=clr, opacity=0.85,
+                            hovertemplate=f"{stg}<br>%{{x}}: $%{{y:.1f}}M<extra></extra>",
+                        ))
+                    # Unknown/FA years
+                    _unk_vals = [0, 0, 0]
+                    for yr_i, yr in enumerate(_years_lbl):
+                        _unk_vals[yr_i] = float(_fut_df[_fut_df[yr].isna()].shape[0] * 0)  # placeholder
+                    _fig_fut.add_hline(y=244, line_dash="dash", line_color="#f59e0b", opacity=0.5,
+                                       annotation_text="CBT $244M", annotation_position="top right",
+                                       annotation_font_color="#f59e0b")
+                    _fig_fut.add_hline(y=float(budget_M), line_dash="dot", line_color="#3b82f6", opacity=0.4,
+                                       annotation_text=f"Budget ${budget_M}M", annotation_position="bottom right",
+                                       annotation_font_color="#3b82f6")
+                    _fig_fut.update_layout(**_pt(
+                        title="Projected Payroll by Stage (2026–2028)",
+                        yaxis=dict(title="Total $M"), height=340,
+                        barmode="stack", showlegend=True,
+                        legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
+                    ))
+                    st.plotly_chart(_fig_fut, use_container_width=True, config={"displayModeBar": False})
+
+                    # Summary table
+                    _fut_show = _fut_df[["Player", "Stage", "2026", "2027", "2028"]].copy()
+                    _fut_show["2026"] = _fut_show["2026"].apply(lambda v: f"${v:.1f}M" if pd.notna(v) else "—")
+                    _fut_show["2027"] = _fut_show["2027"].apply(lambda v: f"~${v:.1f}M" if pd.notna(v) else "Free Agent")
+                    _fut_show["2028"] = _fut_show["2028"].apply(lambda v: f"~${v:.1f}M" if pd.notna(v) else "Free Agent")
+                    st.dataframe(_fut_show, hide_index=True, use_container_width=True,
+                                 height=min(60 + n_rostered * 35, 400))
+                    st.caption(
+                        "2026 salaries reflect actual contracts. 2027–2028 figures for arbitration-eligible "
+                        "players are estimates based on typical raise rates. Free agent years (shown as "
+                        "'Free Agent') assume the player's contract expires."
+                    )
+
                 with st.expander("🔄 Trade Analyzer", expanded=False):
                     _render_trade_analyzer(roster_df)
 
