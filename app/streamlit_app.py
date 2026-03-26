@@ -8351,7 +8351,7 @@ def _render_rankings_page():
 
 _ABBR_TO_FULL: dict[str, str] = {v: k for k, v in _PAYROLL_2026_TEAM_MAP.items()}
 _TEAM_CITIES: dict[str, str] = {
-    "ARI": "Arizona", "ATH": "Athletics", "ATL": "Atlanta", "BAL": "Baltimore",
+    "ARI": "Arizona", "ATH": "Las Vegas", "ATL": "Atlanta", "BAL": "Baltimore",
     "BOS": "Boston", "CHC": "Chicago", "CHW": "Chicago", "CIN": "Cincinnati",
     "CLE": "Cleveland", "COL": "Colorado", "DET": "Detroit", "HOU": "Houston",
     "KCR": "Kansas City", "LAA": "Los Angeles", "LAD": "Los Angeles", "MIA": "Miami",
@@ -8403,13 +8403,32 @@ def _render_team_analysis_page():
 
     _full_name = f"{_TEAM_CITIES.get(sel_team, '')} {_ABBR_TO_FULL.get(sel_team, sel_team)}"
 
-    # ── Load team payroll data ───────────────────────────────────────────
+    # ── Load 2025 combined stats (primary stats source) ──────────────────
+    try:
+        _comb_all = _read_csv(combined_csv, low_memory=False)
+        _comb_all.columns = [c.strip() for c in _comb_all.columns]
+        _comb_all["Year"] = pd.to_numeric(_comb_all["Year"], errors="coerce")
+        for _nc in ["WAR_Total", "Salary_M", "Age", "HR", "AVG", "ERA", "IP", "PA"]:
+            if _nc in _comb_all.columns:
+                _comb_all[_nc] = pd.to_numeric(_comb_all[_nc], errors="coerce")
+        _comb_2025 = _comb_all[_comb_all["Year"] == 2025].copy()
+        _comb_team = _comb_2025[_comb_2025["Team"] == sel_team].copy()
+    except Exception:
+        _comb_all = pd.DataFrame()
+        _comb_2025 = pd.DataFrame()
+        _comb_team = pd.DataFrame()
+
+    # ── Load 2026 payroll data ───────────────────────────────────────────
     try:
         _pay_hash = _dir_hash(payroll_dir) if not _R2_MODE else "r2"
         df26 = _cached_2026_payroll(payroll_dir, combined_csv, _pay_hash)
         team_pay = df26[df26["Team"] == sel_team].copy() if not df26.empty else pd.DataFrame()
     except Exception:
         team_pay = pd.DataFrame()
+
+    # If payroll data unavailable, fall back to combined 2025 data for salary
+    if team_pay.empty and not _comb_team.empty:
+        team_pay = _comb_team.copy()
 
     # ── Load 40-man roster for this team ─────────────────────────────────
     team_roster = roster_40[roster_40["team"] == sel_team].copy() if not roster_40.empty else pd.DataFrame()
@@ -8488,26 +8507,56 @@ def _render_team_analysis_page():
     # ── Tab 1 — Roster ───────────────────────────────────────────────────
     with tt1:
         if not team_roster.empty:
-            # Merge ALL roster players with payroll data
+            # Merge roster players with stats (2025) + payroll (2026)
             _merged = team_roster.copy()
-            if not team_pay.empty:
-                _merge_cols = [c for c in ["Player", "Salary_M", "WAR_Total", "Stage_Clean", "Age",
-                               "W_per_M", "PPR", "HR", "AVG", "ERA", "IP"] if c in team_pay.columns]
-                _pay_lookup = team_pay[_merge_cols].copy()
-                _pay_lookup["_key"] = _pay_lookup["Player"].str.lower().str.strip()
-                _merged["_key"] = _merged["full_name"].str.lower().str.strip()
-                _merged = _merged.merge(_pay_lookup, on="_key", how="left")
+            # Normalize 40-man names to match our datasets
+            _merged["_key"] = _merged["full_name"].apply(_fix_player_name).str.lower().str.strip()
+
+            # Merge 2025 stats from combined dataset
+            if not _comb_team.empty:
+                _stat_cols = [c for c in ["Player", "WAR_Total", "Age", "Position",
+                              "Stage_Clean", "HR", "AVG", "OBP", "SLG", "ERA", "IP", "PA"]
+                              if c in _comb_team.columns]
+                _stat_lk = _comb_team[_stat_cols].drop_duplicates(subset=["Player"], keep="first").copy()
+                _stat_lk["_key"] = _stat_lk["Player"].str.lower().str.strip()
+                _merged = _merged.merge(_stat_lk.drop(columns=["Player"]), on="_key", how="left")
+
+            # Merge 2026 salary from payroll dataset
+            if not team_pay.empty and "Player" in team_pay.columns:
+                _sal_cols = [c for c in ["Player", "Salary_M", "2027", "2028"] if c in team_pay.columns]
+                _sal_lk = team_pay[_sal_cols].drop_duplicates(subset=["Player"], keep="first").copy()
+                _sal_lk["_key"] = _sal_lk["Player"].str.lower().str.strip()
+                # Avoid column collision
+                _sal_rename = {}
+                for c in _sal_lk.columns:
+                    if c in _merged.columns and c != "_key":
+                        _sal_rename[c] = c + "_pay"
+                _sal_lk = _sal_lk.rename(columns=_sal_rename)
+                _merged = _merged.merge(_sal_lk, on="_key", how="left")
+                # Use payroll salary if available, otherwise keep combined
+                if "Salary_M_pay" in _merged.columns:
+                    _merged["Salary_M"] = _merged["Salary_M_pay"].fillna(_merged.get("Salary_M", 0.74))
+
+            # Fill missing salary with league min
+            if "Salary_M" not in _merged.columns:
+                _merged["Salary_M"] = 0.74
+            _merged["Salary_M"] = _merged["Salary_M"].fillna(0.74)
 
             # Build display table
             _rtbl = pd.DataFrame()
             _rtbl["Player"] = _merged["full_name"]
             _rtbl["Pos"] = _merged["position"]
             _rtbl["Status"] = _merged["status"].apply(lambda s: "60-Day IL" if "Injured" in str(s) else "Active")
-            _rtbl["Stage"] = _merged.get("Stage_Clean", pd.Series(["—"] * len(_merged)))
+            _rtbl["Stage"] = _merged.get("Stage_Clean", pd.Series(["—"] * len(_merged))).fillna("—")
             _rtbl["Age"] = _merged.get("Age", pd.Series([None] * len(_merged)))
-            _rtbl["Salary $M"] = _merged.get("Salary_M", pd.Series([0.74] * len(_merged))).fillna(0.74)
-            _rtbl["fWAR"] = _merged.get("WAR_Total", pd.Series([None] * len(_merged)))
-            _rtbl["fWAR/$M"] = (_rtbl["fWAR"].fillna(0) / _rtbl["Salary $M"].clip(lower=0.01)).round(2)
+            _rtbl["'26 Salary $M"] = _merged["Salary_M"]
+            _rtbl["'25 fWAR"] = _merged.get("WAR_Total", pd.Series([None] * len(_merged)))
+            _rtbl["fWAR/$M"] = (_rtbl["'25 fWAR"].fillna(0) / _rtbl["'26 Salary $M"].clip(lower=0.01)).round(2)
+            # Add a few key stats
+            if "ERA" in _merged.columns:
+                _rtbl["ERA"] = _merged["ERA"]
+            if "HR" in _merged.columns:
+                _rtbl["HR"] = _merged["HR"]
             _rtbl = _rtbl.sort_values("fWAR/$M", ascending=False).reset_index(drop=True)
             _rtbl.insert(0, "#", range(1, len(_rtbl) + 1))
 
@@ -8522,21 +8571,23 @@ def _render_team_analysis_page():
                     return [f"background-color:{bg}66"] * len(row)
                 return [""] * len(row)
 
-            st.markdown(f"##### Active Roster ({len(_rtbl[_rtbl['Status'] == 'Active'])} players, "
-                        f"{len(_rtbl[_rtbl['Status'] != 'Active'])} on IL)")
+            _n_act = len(_rtbl[_rtbl["Status"] == "Active"])
+            _n_il = len(_rtbl[_rtbl["Status"] != "Active"])
+            st.markdown(f"##### 40-Man Roster ({_n_act} active, {_n_il} on IL)")
             st.markdown(
                 "<div style='font-size:0.78rem;color:#7a9ebc;margin-bottom:0.4rem;'>"
-                "Ranked by fWAR per $M (most efficient first). Color: "
+                "Ranked by fWAR per $M (most efficient first). '25 fWAR = 2025 stats. '26 Salary = 2026 contract. Color: "
                 "<span style='color:#22c55e;'>Pre-Arb</span> · "
                 "<span style='color:#f59e0b;'>Arb</span> · "
                 "<span style='color:#3b82f6;'>FA</span> · "
                 "<span style='color:#fca5a5;'>IL</span></div>",
                 unsafe_allow_html=True,
             )
+            _fmt_dict = {"Age": "{:.0f}", "'26 Salary $M": "{:.1f}", "'25 fWAR": "{:.1f}",
+                         "fWAR/$M": "{:.2f}", "ERA": "{:.2f}", "HR": "{:.0f}"}
             st.dataframe(
-                _rtbl.style.apply(_stage_clr, axis=1).format({
-                    "Age": "{:.0f}", "Salary $M": "{:.1f}", "fWAR": "{:.1f}", "fWAR/$M": "{:.2f}",
-                }, na_rep="—"),
+                _rtbl.style.apply(_stage_clr, axis=1).format(
+                    {k: v for k, v in _fmt_dict.items() if k in _rtbl.columns}, na_rep="—"),
                 hide_index=True, use_container_width=True,
                 height=min(60 + len(_rtbl) * 35, 700),
             )
