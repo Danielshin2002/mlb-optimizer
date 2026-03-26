@@ -3275,7 +3275,7 @@ def _render_simulator_page():
             return
 
     # ── Load 40-man roster CSV ──────────────────────────────────────────────
-    _roster_40_path = _data_url("data/40man_rosters_2025.csv")
+    _roster_40_path = _data_url("40man_rosters_2025.csv")
     _roster_40 = _cached_40man_roster(_roster_40_path, _file_hash(_roster_40_path))
     st.session_state["_sim_roster_40"] = _roster_40
 
@@ -8362,7 +8362,7 @@ def _render_team_analysis_page():
     # ── Data loading ─────────────────────────────────────────────────────
     detail_csv   = _data_url("efficiency_detail.csv")
     combined_csv = _data_url("data/mlb_combined_2021_2025.csv")
-    roster_csv   = _data_url("data/40man_rosters_2025.csv")
+    roster_csv   = _data_url("40man_rosters_2025.csv")
 
     try:
         detail_df = _read_csv(detail_csv)
