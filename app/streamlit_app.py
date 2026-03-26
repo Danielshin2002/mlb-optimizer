@@ -2520,8 +2520,8 @@ def _render_home_page():
         align-items: center;
         justify-content: center;
         min-height: 100vh;
-        gap: 0.45rem;
-        padding: 1.6rem 2rem 2rem;
+        gap: 0.4rem;
+        padding: 0.8rem 2rem 2rem;
     }
     /* gradient only on the text — emoji lives in its own span */
     .home-title-grad {
@@ -2723,7 +2723,7 @@ def _render_home_page():
           <span class="home-title-grad">MLB Toolbox</span><span class="home-ball">&#9918;</span>
         </div>
         <div class="home-mission">
-          Provide baseball fans with visualization tools and metrics to better track, rank and forecast team and player cost-per-win efficiency
+          Provide baseball fans with visualization tools and metrics to better<br>track, rank and forecast team and player cost-per-win efficiency
         </div>
         <hr class="home-rule">
         <div class="home-cta">Choose a tool to get started</div>
