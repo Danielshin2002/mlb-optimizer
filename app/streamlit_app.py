@@ -8487,6 +8487,17 @@ def _fetch_2026_standings() -> dict[str, tuple[int, int]]:
 def _render_team_analysis_page():
     """Full team deep-dive page — roster, rankings, salary, projections."""
 
+    # ── Team picker CSS ──────────────────────────────────────────────────
+    st.markdown("""<style>
+    /* Compact team picker buttons */
+    div[data-testid="stHorizontalBlock"] [data-testid="stButton"] > button {
+        padding: 0.35rem 0.3rem !important;
+        font-size: 0.82rem !important;
+        min-height: 2.2rem !important;
+        border-radius: 6px !important;
+    }
+    </style>""", unsafe_allow_html=True)
+
     # ── Data loading (enriched roster = single source of truth) ─────────
     _enriched = _load_enriched_roster()
     try:
@@ -8494,18 +8505,60 @@ def _render_team_analysis_page():
     except Exception:
         detail_df = pd.DataFrame()
 
-    # Available teams
-    _teams = sorted(_enriched["team"].dropna().unique()) if not _enriched.empty else sorted(_ABBR_TO_FULL.keys())
+    # ── Team selector — visual grid by division ────────────────────────
+    _DIVISIONS = {
+        "American League": {
+            "AL East":    ["BAL", "BOS", "NYY", "TBR", "TOR"],
+            "AL Central": ["CHW", "CLE", "DET", "KCR", "MIN"],
+            "AL West":    ["ATH", "HOU", "LAA", "SEA", "TEX"],
+        },
+        "National League": {
+            "NL East":    ["ATL", "MIA", "NYM", "PHI", "WSN"],
+            "NL Central": ["CHC", "CIN", "MIL", "PIT", "STL"],
+            "NL West":    ["ARI", "COL", "LAD", "SDP", "SFG"],
+        },
+    }
 
-    # ── Team selector ────────────────────────────────────────────────────
-    sel_col, _, _ = st.columns([2, 3, 3])
-    with sel_col:
-        sel_team = st.selectbox(
-            "Select a Team",
-            _teams,
-            format_func=lambda t: f"{_TEAM_CITIES.get(t, t)} {_ABBR_TO_FULL.get(t, t)} ({t})",
-            key="team_analysis_sel",
+    # Get or initialize selected team
+    if "team_analysis_sel" not in st.session_state:
+        st.session_state["team_analysis_sel"] = "NYY"
+    sel_team = st.session_state["team_analysis_sel"]
+
+    # Render team picker grid
+    for league, divisions in _DIVISIONS.items():
+        st.markdown(
+            f"<div style='font-size:0.75rem;font-weight:700;color:#7a9ebc;text-transform:uppercase;"
+            f"letter-spacing:0.1em;margin:0.6rem 0 0.3rem;'>{league}</div>",
+            unsafe_allow_html=True,
         )
+        for div_name, div_teams in divisions.items():
+            cols = st.columns([1.2] + [1] * len(div_teams))
+            with cols[0]:
+                st.markdown(
+                    f"<div style='font-size:0.65rem;color:#4a687e;padding-top:0.6rem;'>{div_name}</div>",
+                    unsafe_allow_html=True,
+                )
+            for i, tm in enumerate(div_teams):
+                tc_p, tc_a, tc_d = _TEAM_COLORS.get(tm, ("#3b82f6", "#93c5fd", "#081420"))
+                is_active = tm == sel_team
+                _border = f"2px solid {tc_p}" if is_active else f"1px solid {tc_p}44"
+                _bg = tc_d if is_active else "#111927"
+                _shadow = f"0 0 12px {tc_p}40" if is_active else "none"
+                with cols[i + 1]:
+                    if st.button(
+                        f"**{tm}**",
+                        key=f"tpick_{tm}",
+                        use_container_width=True,
+                    ):
+                        st.session_state["team_analysis_sel"] = tm
+                        st.rerun()
+                    # Style overlay for the button
+                    st.markdown(
+                        f"<div style='margin-top:-0.5rem;text-align:center;font-size:0.58rem;"
+                        f"color:{tc_a if is_active else '#4a687e'};'>"
+                        f"{_ABBR_TO_FULL.get(tm, tm)}</div>",
+                        unsafe_allow_html=True,
+                    )
 
     _full_name = f"{_TEAM_CITIES.get(sel_team, '')} {_ABBR_TO_FULL.get(sel_team, sel_team)}"
 
