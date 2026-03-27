@@ -5873,8 +5873,8 @@ justify-content:space-between;gap:16px;flex-wrap:wrap;">
       <div style="font-size:13px;font-weight:700;color:#22c55e;margin-bottom:4px;">Pre-Arbitration</div>
       <div style="font-size:10px;color:#7a9ebc;line-height:1.5;">0–3 years service time. Salary near league minimum (~$740K). Teams control rights — often the best value in baseball.</div>
     </div>
-    <div style="background:#0d1b2a;border:1px solid #b88840;border-radius:8px;padding:10px 12px;">
-      <div style="font-size:13px;font-weight:700;color:#f59e0b;margin-bottom:4px;">Arbitration</div>
+    <div style="background:#0d1b2a;border:1px solid #14b8a6;border-radius:8px;padding:10px 12px;">
+      <div style="font-size:13px;font-weight:700;color:#14b8a6;margin-bottom:4px;">Arbitration</div>
       <div style="font-size:10px;color:#7a9ebc;line-height:1.5;">3–6 years service time. Salary negotiated or set by arbitration hearing. Pay rises based on prior performance.</div>
     </div>
     <div style="background:#0d1b2a;border:1px solid #3b6fd4;border-radius:8px;padding:10px 12px;">
@@ -8430,6 +8430,58 @@ _TEAM_CITIES: dict[str, str] = {
     "TOR": "Toronto", "WSN": "Washington",
 }
 
+# Team primary + accent colors (primary, accent, dark bg tint)
+_TEAM_COLORS: dict[str, tuple[str, str, str]] = {
+    "ARI": ("#a71930", "#e3d4ad", "#1a0810"), "ATH": ("#003831", "#efb21e", "#0a1a14"),
+    "ATL": ("#ce1141", "#13274f", "#1a0810"), "BAL": ("#df4601", "#27251f", "#1a0f08"),
+    "BOS": ("#bd3039", "#0c2340", "#1a0c10"), "CHC": ("#0e3386", "#cc3433", "#081a2d"),
+    "CHW": ("#27251f", "#c4ced4", "#0e0e0d"), "CIN": ("#c6011f", "#000000", "#1a0810"),
+    "CLE": ("#00385d", "#e31937", "#081420"), "COL": ("#33006f", "#c4ced4", "#10082a"),
+    "DET": ("#0c2340", "#fa4616", "#081420"), "HOU": ("#002d62", "#eb6e1f", "#081420"),
+    "KCR": ("#004687", "#bd9b60", "#081420"), "LAA": ("#ba0021", "#003263", "#1a0810"),
+    "LAD": ("#005a9c", "#ef3e42", "#081828"), "MIA": ("#00a3e0", "#ef3340", "#081a20"),
+    "MIL": ("#12284b", "#ffc52f", "#081420"), "MIN": ("#002b5c", "#d31145", "#081420"),
+    "NYM": ("#002d72", "#ff5910", "#081420"), "NYY": ("#003087", "#c4ced4", "#081420"),
+    "PHI": ("#e81828", "#002d72", "#1a0810"), "PIT": ("#27251f", "#fdb827", "#0e0e0d"),
+    "SDP": ("#2f241d", "#ffc425", "#0e0c0a"), "SEA": ("#0c2c56", "#005c5c", "#081420"),
+    "SFG": ("#fd5a1e", "#27251f", "#1a0f08"), "STL": ("#c41e3a", "#0c2340", "#1a0810"),
+    "TBR": ("#092c5c", "#8fbce6", "#081420"), "TEX": ("#003278", "#c0111f", "#081420"),
+    "TOR": ("#134a8e", "#1d2d5c", "#081828"), "WSN": ("#ab0003", "#14225a", "#1a0810"),
+}
+
+# MLB Stats API team ID → abbreviation mapping
+_MLB_TEAM_ID_MAP: dict[int, str] = {
+    108: "LAA", 109: "ARI", 110: "BAL", 111: "BOS", 112: "CHC", 113: "CIN",
+    114: "CLE", 115: "COL", 116: "DET", 117: "HOU", 118: "KCR", 119: "LAD",
+    120: "WSN", 121: "NYM", 133: "ATH", 134: "PIT", 135: "SDP", 136: "SEA",
+    137: "SFG", 138: "STL", 139: "TBR", 140: "TEX", 141: "TOR", 142: "MIN",
+    143: "PHI", 144: "ATL", 145: "CHW", 146: "MIA", 147: "NYY", 158: "MIL",
+}
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _fetch_2026_standings() -> dict[str, tuple[int, int]]:
+    """Fetch current 2026 W-L records from MLB Stats API. Cached for 24 hours."""
+    try:
+        resp = _requests.get(
+            "https://statsapi.mlb.com/api/v1/standings"
+            "?leagueId=103,104&season=2026&standingsTypes=regularSeason",
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return {}
+        data = resp.json()
+        records: dict[str, tuple[int, int]] = {}
+        for division in data.get("records", []):
+            for tr in division.get("teamRecords", []):
+                tid = tr.get("team", {}).get("id")
+                abbr = _MLB_TEAM_ID_MAP.get(tid)
+                if abbr:
+                    records[abbr] = (int(tr.get("wins", 0)), int(tr.get("losses", 0)))
+        return records
+    except Exception:
+        return {}
+
 
 def _render_team_analysis_page():
     """Full team deep-dive page — roster, rankings, salary, projections."""
@@ -8500,28 +8552,36 @@ def _render_team_analysis_page():
 
     _dpw = round(_payroll_m / max(_war, 0.1), 1)
 
+    # Team colors
+    _tc_primary, _tc_accent, _tc_dark = _TEAM_COLORS.get(sel_team, ("#3b82f6", "#93c5fd", "#081420"))
+
+    # Live 2026 record from MLB API (cached 24h)
+    _standings = _fetch_2026_standings()
+    _w26, _l26 = _standings.get(sel_team, (0, 0))
+    _record_26 = f"{_w26}–{_l26}" if (_w26 + _l26) > 0 else "—"
+
     st.markdown(
-        f"<div style='background:linear-gradient(135deg,#0f2035,#0d1b2a);border:1px solid #1e3a5c;"
-        f"border-radius:10px;padding:16px 20px;margin-bottom:14px;'>"
+        f"<div style='background:linear-gradient(135deg,{_tc_dark},{_tc_dark}cc);border:1px solid {_tc_primary}44;"
+        f"border-left:4px solid {_tc_primary};border-radius:10px;padding:16px 20px;margin-bottom:14px;'>"
         f"<div style='font-size:1.4rem;font-weight:800;color:#e8f4ff;margin-bottom:8px;'>"
         f"{_full_name}</div>"
         f"<div style='display:flex;flex-wrap:wrap;gap:12px;'>"
-        f"<div style='background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;'>"
-        f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>2025 Record</div>"
+        f"<div style='background:{_tc_dark};border:1px solid {_tc_primary}33;border-radius:8px;padding:8px 14px;text-align:center;'>"
+        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>2025 Record</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_wins}W</div></div>"
-        f"<div style='background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;'>"
-        f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>2026 Record</div>"
-        f"<div style='font-size:1.2rem;font-weight:700;color:#4a687e;'>—</div></div>"
-        f"<div style='background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;'>"
-        f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>2026 Payroll</div>"
+        f"<div style='background:{_tc_dark};border:1px solid {_tc_primary}33;border-radius:8px;padding:8px 14px;text-align:center;'>"
+        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>2026 Record</div>"
+        f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_record_26}</div></div>"
+        f"<div style='background:{_tc_dark};border:1px solid {_tc_primary}33;border-radius:8px;padding:8px 14px;text-align:center;'>"
+        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>2026 Payroll</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>${_payroll_m:.0f}M</div>"
         f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_pay_rank}/30</div></div>"
-        f"<div style='background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;'>"
-        f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>Team fWAR</div>"
+        f"<div style='background:{_tc_dark};border:1px solid {_tc_primary}33;border-radius:8px;padding:8px 14px;text-align:center;'>"
+        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>Team fWAR</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_war:.1f}</div>"
         f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_war_rank}/30</div></div>"
-        f"<div style='background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;'>"
-        f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>Efficiency</div>"
+        f"<div style='background:{_tc_dark};border:1px solid {_tc_primary}33;border-radius:8px;padding:8px 14px;text-align:center;'>"
+        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>Efficiency</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:{'#22c55e' if _gap < 0 else '#ef4444'};'>"
         f"{'$' + str(int(_gap)) + 'M' if _gap <= 0 else '+$' + str(int(_gap)) + 'M'}</div>"
         f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_eff_rank}/30</div></div>"
@@ -8568,7 +8628,7 @@ def _render_team_analysis_page():
             _rtbl = _rtbl.sort_values("'26 Salary $M", ascending=False).reset_index(drop=True)
             _rtbl.insert(0, "#", range(1, len(_rtbl) + 1))
 
-            _STG_CLR = {"Pre-Arb": "#14532d", "Arb": "#2d1f0c", "Guaranteed": "#0c1a2d"}
+            _STG_CLR = {"Pre-Arb": "#14532d", "Arb": "#0c2a2a", "Guaranteed": "#0c1a2d"}
             def _stage_clr(row):
                 stg = str(row.get("Stage", ""))
                 if "IL" in str(row.get("Status", "")):
@@ -8583,7 +8643,7 @@ def _render_team_analysis_page():
                 "<div style='font-size:0.78rem;color:#7a9ebc;margin-bottom:0.4rem;'>"
                 "Sorted by 2026 salary (highest first). Color: "
                 "<span style='color:#22c55e;'>Pre-Arb</span> · "
-                "<span style='color:#f59e0b;'>Arb</span> · "
+                "<span style='color:#14b8a6;'>Arb</span> · "
                 "<span style='color:#3b82f6;'>Guaranteed</span> · "
                 "<span style='color:#fca5a5;'>IL</span></div>",
                 unsafe_allow_html=True,
