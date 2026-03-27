@@ -1258,21 +1258,26 @@ def _build_carousel_players(combined_path: str) -> list[str]:
         df.columns = [c.strip() for c in df.columns]
         df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
         df["WAR_Total"] = pd.to_numeric(df.get("WAR_Total", pd.Series(dtype=float)), errors="coerce")
+        df["Salary_M"] = pd.to_numeric(df.get("Salary_M", pd.Series(dtype=float)), errors="coerce")
         df25 = df[df["Year"] == 2025].dropna(subset=["WAR_Total", "Team", "Player"])
+        df25["_eff"] = df25["WAR_Total"] / df25["Salary_M"].clip(lower=0.01)
 
         mlbam = _cached_mlbam_lookup(_RAZZBALL_PATH)
 
+        # 1 best efficiency player per stage per team (3 per team)
+        _stages = {"FA": "Free Agent", "Arb": "Arbitration", "Pre-Arb": "Pre-Arbitration"}
         result = []
         for _tm, grp in df25.groupby("Team"):
-            top = grp.sort_values("WAR_Total", ascending=False)
-            added = 0
-            for _, row in top.iterrows():
-                if added >= 3:
-                    break
-                pname = row["Player"]
-                if pname in mlbam:  # has a headshot
-                    result.append(pname)
-                    added += 1
+            for stg_key in _stages:
+                stg_players = grp[grp.get("Stage_Clean", pd.Series()).str.contains(stg_key, case=False, na=False)]
+                if stg_players.empty:
+                    continue
+                best = stg_players.sort_values("_eff", ascending=False)
+                for _, row in best.iterrows():
+                    pname = row["Player"]
+                    if pname in mlbam:
+                        result.append(pname)
+                        break
         return result
     except Exception:
         return []
@@ -2707,7 +2712,7 @@ def _render_home_page():
         flex-direction: column;
         justify-content: space-evenly;
         padding: 10px 0;
-        opacity: 0.10;
+        opacity: 0.08;
     }
     .cr-row   { overflow: hidden; }
     .cr-track { display: flex; width: max-content; }
@@ -2725,7 +2730,7 @@ def _render_home_page():
         100% { transform: translateX(-50%); }
     }
     .cr-img {
-        width: 240px; height: 240px;
+        width: 260px; height: 260px;
         object-fit: cover; object-position: top center;
         border-radius: 10px; margin: 0 10px; flex-shrink: 0;
     }
@@ -2942,7 +2947,7 @@ def _render_home_page():
           <span class="home-title-grad">MLB Toolbox</span><span class="home-ball">&#9918;</span>
         </div>
         <div class="home-mission">
-          Provide visualization tools and metrics to better<br>track, rank and forecast team and player cost per win efficiency
+          Providing visualization tools and metrics to better<br>track, rank, and forecast team and player cost per performance efficiency
         </div>
         <hr class="home-rule">
         <div class="home-cta">Choose a tool to get started</div>
@@ -7690,7 +7695,7 @@ def _render_rankings_page():
     # ── Page header ───────────────────────────────────────────────────────────
     st.markdown(
         "<div class='rk-hdr'>"
-        "<h2>🏆 MLB Efficiency Rankings</h2>"
+        "<h2>🏆 MLB Spending Efficiency Rankings</h2>"
         "<div class='rk-sub'>All 30 MLB teams ranked by spending efficiency, fWAR production, "
         "payroll, and win performance. Efficiency measures how far above or below the "
         "cost-effective line each team sits — negative means winning more per dollar.</div>"
@@ -7787,7 +7792,7 @@ def _render_rankings_page():
         ), unsafe_allow_html=True)
     with qa3:
         st.markdown(_qa(
-            "💰", "BEST $ PER fWAR",
+            "💰", "LOWEST $ PER fWAR",
             _full(_best_dpw),
             f"${_best_dpw['DPW']:.1f}M per fWAR",
             "#1a1228",
@@ -7795,7 +7800,7 @@ def _render_rankings_page():
         ), unsafe_allow_html=True)
     with qa4:
         st.markdown(_qa(
-            "🔴", "LEAST EFFICIENT SPENDING",
+            "🔴", "LEAST EFFICIENT",
             _full(_worst_eff),
             f"${_worst_eff['dollar_gap_M']:.0f}M above the line",
             "#280c0c",
@@ -7869,7 +7874,7 @@ def _render_rankings_page():
             st.plotly_chart(_hbar(
                 _eff, "dollar_gap_M",
                 color_fn=lambda v: "#22c55e" if v <= 0 else "#ef4444",
-                title=f"{sel_year} — Efficiency Ranking of MLB Team Spending $ to Regular Season Wins",
+                title=f"{sel_year} — Spending Efficiency Ranking of MLB Teams Based on Regular Season Wins",
                 x_label="$ Gap ($M) — negative = efficient",
                 text_fn=lambda v: f"${v:+.0f}M",
                 zero_line=True,
