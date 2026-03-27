@@ -1201,6 +1201,53 @@ def _cached_40man_roster(roster_path: str, fhash: str) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
+def _load_enriched_roster() -> pd.DataFrame:
+    """Load the enriched 2026 roster+payroll dataset (single source of truth).
+
+    Contains 1,248 players across 30 teams with salary, contract stage,
+    status, position, and year-by-year commitments through 2032.
+    """
+    path = _data_url("roster_payroll_2026_enriched.csv")
+    try:
+        df = _read_csv(path, low_memory=False)
+    except Exception:
+        return pd.DataFrame()
+    df.columns = [c.strip() for c in df.columns]
+
+    # Primary position: first before any "/"
+    if "position" in df.columns:
+        df["position_primary"] = df["position"].astype(str).str.split("/").str[0].str.strip()
+        df.loc[df["position_primary"].isin(["nan", "None", ""]), "position_primary"] = pd.NA
+
+    # Clean stage display
+    _stg_map = {"Guaranteed": "Guaranteed", "Arb-Eligible": "Arb",
+                "Arb": "Arb", "Pre-Arb": "Pre-Arb", "FA": "FA", "Off 40-Man": "Off 40-Man"}
+    if "contract_stage" in df.columns:
+        df["stage_display"] = df["contract_stage"].map(_stg_map).fillna("—")
+
+    # FA year: first year where status == FREE AGENT
+    def _fa_year(row):
+        for yr in range(2026, 2033):
+            if str(row.get(f"status_{yr}", "")).upper() == "FREE AGENT":
+                return yr
+        return None
+    df["fa_year"] = df.apply(_fa_year, axis=1)
+
+    # Contract years remaining (Signed years only)
+    def _yrs_rem(row):
+        return sum(1 for yr in range(2026, 2033) if str(row.get(f"status_{yr}", "")).upper() == "SIGNED")
+    df["contract_years_remaining"] = df.apply(_yrs_rem, axis=1)
+
+    # Ensure salary columns are numeric
+    for yr in range(2026, 2033):
+        col = f"salary_{yr}_M"
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    return df
+
+
+@st.cache_data(show_spinner=False)
 def _build_carousel_players(combined_path: str) -> list[str]:
     """Return top-3 WAR players per team from 2025, ensuring all 30 teams are represented.
 
@@ -8387,31 +8434,15 @@ _TEAM_CITIES: dict[str, str] = {
 def _render_team_analysis_page():
     """Full team deep-dive page — roster, rankings, salary, projections."""
 
-    # ── Data loading ─────────────────────────────────────────────────────
-    detail_csv   = _data_url("efficiency_detail.csv")
-    combined_csv = _data_url("data/mlb_combined_2021_2025.csv")
-    roster_csv   = _data_url("40man_rosters_2025.csv")
-
+    # ── Data loading (enriched roster = single source of truth) ─────────
+    _enriched = _load_enriched_roster()
     try:
-        detail_df = _read_csv(detail_csv)
+        detail_df = _read_csv(_data_url("efficiency_detail.csv"))
     except Exception:
         detail_df = pd.DataFrame()
-    # Load 40-man roster — try cached first, then direct read
-    roster_40 = st.session_state.get("_sim_roster_40", pd.DataFrame())
-    if roster_40.empty:
-        _r40_hash = "r2-remote" if _R2_MODE else _file_hash(roster_csv)
-        roster_40 = _cached_40man_roster(roster_csv, _r40_hash)
-    if roster_40.empty:
-        # Direct fallback read (bypass cache) for R2 mode
-        try:
-            roster_40 = _read_csv(roster_csv, low_memory=False)
-            roster_40.columns = [c.strip() for c in roster_40.columns]
-        except Exception:
-            roster_40 = pd.DataFrame()
-    payroll_dir = _data_url("2026 Payroll") if _R2_MODE else os.path.join(_ROOT_DIR, "2026 Payroll")
 
-    # Available teams from 40-man CSV
-    _teams = sorted(roster_40["team"].dropna().unique()) if not roster_40.empty else sorted(_ABBR_TO_FULL.keys())
+    # Available teams
+    _teams = sorted(_enriched["team"].dropna().unique()) if not _enriched.empty else sorted(_ABBR_TO_FULL.keys())
 
     # ── Team selector ────────────────────────────────────────────────────
     sel_col, _, _ = st.columns([2, 3, 3])
@@ -8425,33 +8456,23 @@ def _render_team_analysis_page():
 
     _full_name = f"{_TEAM_CITIES.get(sel_team, '')} {_ABBR_TO_FULL.get(sel_team, sel_team)}"
 
-    # ── Load simulator data (same enriched dataset the simulator uses) ───
-    _ind_path = _data_url("data/2025mlbshared.csv")
-    _sim_hash = "r2-remote" if _R2_MODE else _file_hash(combined_csv)
-    try:
-        _sim_df = _cached_simulator_data(combined_csv, _ind_path, _sim_hash)
-        _comb_team = _sim_df[_sim_df["Team"] == sel_team].copy()
-    except Exception:
-        _sim_df = pd.DataFrame()
-        _comb_team = pd.DataFrame()
+    # ── Filter enriched data for selected team ───────────────────────────
+    team_data = _enriched[_enriched["team"] == sel_team].copy() if not _enriched.empty else pd.DataFrame()
+    team_pay = team_data  # alias for compatibility
 
-    # ── Load 2026 payroll data ───────────────────────────────────────────
-    try:
-        _pay_hash = _dir_hash(payroll_dir) if not _R2_MODE else "r2"
-        df26 = _cached_2026_payroll(payroll_dir, combined_csv, _pay_hash)
-        team_pay = df26[df26["Team"] == sel_team].copy() if not df26.empty else pd.DataFrame()
-    except Exception:
-        team_pay = pd.DataFrame()
+    # Roster counts by status
+    n_active = int((team_data["status"] == "Active").sum()) if not team_data.empty else 0
+    _il_statuses = ["Injured 10-Day", "Injured 15-Day", "Injured 60-Day"]
+    n_il = int(team_data["status"].isin(_il_statuses).sum()) if not team_data.empty else 0
+    n_restricted = int((team_data["status"] == "Restricted").sum()) if not team_data.empty else 0
+    n_total = len(team_data)
 
-    # Fall back to simulator data if payroll unavailable
-    if team_pay.empty and not _comb_team.empty:
-        team_pay = _comb_team.copy()
-
-    # ── Load 40-man roster for this team ─────────────────────────────────
-    team_roster = roster_40[roster_40["team"] == sel_team].copy() if not roster_40.empty else pd.DataFrame()
-    n_active = int((team_roster["status"] == "Active").sum()) if not team_roster.empty else 0
-    n_il     = int((team_roster["status"] == "Injured 60-Day").sum()) if not team_roster.empty else 0
-    n_total  = len(team_roster)
+    # Team payroll: sum only Signed salaries for accurate total
+    _signed_mask = team_data["status_2026"].astype(str).str.upper() == "SIGNED" if not team_data.empty else pd.Series(dtype=bool)
+    _team_payroll_m = float(team_data.loc[_signed_mask, "salary_2026_M"].sum()) if _signed_mask.any() else 0
+    # Add known arb salaries
+    _arb_mask = team_data["status_2026"].astype(str).str.contains("ARB|TBD", case=False, na=False)
+    _team_payroll_m += float(team_data.loc[_arb_mask, "salary_2026_M"].sum()) if _arb_mask.any() else 0
 
     # ── Efficiency data for this team ────────────────────────────────────
     team_eff = detail_df[detail_df["Team"] == sel_team].copy() if not detail_df.empty else pd.DataFrame()
@@ -8463,11 +8484,10 @@ def _render_team_analysis_page():
     # ══════════════════════════════════════════════════════════════════════
     # HEADER CARD
     # ══════════════════════════════════════════════════════════════════════
-    _payroll_m = float(_latest["payroll_M"]) if _latest is not None else 0
+    _payroll_m = _team_payroll_m if _team_payroll_m > 0 else (float(_latest["payroll_M"]) if _latest is not None else 0)
     _wins      = int(_latest["Wins"]) if _latest is not None else 0
     _war       = float(_latest["team_WAR"]) if _latest is not None else 0
     _gap       = float(_latest["dollar_gap_M"]) if _latest is not None else 0
-    _playoff   = bool(_latest["in_playoffs"]) if _latest is not None else False
 
     # Compute rankings among all teams (2025)
     _eff_rank = int((all_eff_2025["dollar_gap_M"].rank(ascending=True) == all_eff_2025.loc[all_eff_2025["Team"] == sel_team, "dollar_gap_M"].rank(ascending=True).values[0]).sum()) if not all_eff_2025.empty and sel_team in all_eff_2025["Team"].values else 0
@@ -8523,86 +8543,59 @@ def _render_team_analysis_page():
 
     # ── Tab 1 — Roster ───────────────────────────────────────────────────
     with tt1:
-        if not team_roster.empty:
-            # Merge roster players with stats (2025) + payroll (2026)
-            _merged = team_roster.copy()
-            # Normalize 40-man names to match our datasets
-            _merged["_key"] = _merged["full_name"].apply(_fix_player_name).str.lower().str.strip()
-
-            # Build unified lookup from payroll (priority) + simulator data (fallback)
-            _lookup = pd.DataFrame()
-            _lk_cols = ["Player", "WAR_Total", "Age", "Position", "Stage_Clean",
-                        "Salary_M", "PPR", "W_per_M", "HR", "AVG", "ERA", "IP",
-                        "2027", "2028"]
-            if not team_pay.empty and "Player" in team_pay.columns:
-                _lk_pay = team_pay[[c for c in _lk_cols if c in team_pay.columns]].copy()
-                _lk_pay["_key"] = _lk_pay["Player"].str.lower().str.strip()
-                _lookup = _lk_pay.drop_duplicates(subset=["_key"], keep="first")
-            if _lookup.empty and not _comb_team.empty:
-                _lk_sim = _comb_team[[c for c in _lk_cols if c in _comb_team.columns]].copy()
-                _lk_sim["_key"] = _lk_sim["Player"].str.lower().str.strip()
-                _lookup = _lk_sim.drop_duplicates(subset=["_key"], keep="first")
-
-            if not _lookup.empty:
-                _merged = _merged.merge(_lookup.drop(columns=["Player"], errors="ignore"),
-                                        on="_key", how="left")
-
-            # Fill missing salary with league min
-            if "Salary_M" not in _merged.columns:
-                _merged["Salary_M"] = 0.74
-            _merged["Salary_M"] = _merged["Salary_M"].fillna(0.74)
-
-            # Build display table
+        if not team_data.empty:
+            # Build display table directly from enriched data
             _rtbl = pd.DataFrame()
-            _rtbl["Player"] = _merged["full_name"]
-            _rtbl["Pos"] = _merged["position"]
-            _rtbl["Status"] = _merged["status"].apply(lambda s: "60-Day IL" if "Injured" in str(s) else "Active")
-            _rtbl["Stage"] = _merged.get("Stage_Clean", pd.Series(["—"] * len(_merged))).fillna("—")
-            _rtbl["Age"] = _merged.get("Age", pd.Series([None] * len(_merged)))
-            _rtbl["'26 Salary $M"] = _merged["Salary_M"]
-            _rtbl["'25 fWAR"] = _merged.get("WAR_Total", pd.Series([None] * len(_merged)))
-            _rtbl["fWAR/$M"] = (_rtbl["'25 fWAR"].fillna(0) / _rtbl["'26 Salary $M"].clip(lower=0.01)).round(2)
-            # Add a few key stats
-            if "ERA" in _merged.columns:
-                _rtbl["ERA"] = _merged["ERA"]
-            if "HR" in _merged.columns:
-                _rtbl["HR"] = _merged["HR"]
-            _rtbl = _rtbl.sort_values("fWAR/$M", ascending=False).reset_index(drop=True)
+            _rtbl["Player"] = team_data["full_name"].values
+            _rtbl["Pos"] = team_data.get("position_primary", team_data.get("position", pd.Series())).values
+            _rtbl["Status"] = team_data["status"].apply(
+                lambda s: "60-Day IL" if "60" in str(s) else "15-Day IL" if "15" in str(s) else
+                          "10-Day IL" if "10" in str(s) else "Restricted" if "Restrict" in str(s) else "Active"
+            ).values
+            _rtbl["Stage"] = team_data.get("stage_display", team_data.get("contract_stage", pd.Series())).values
+            _rtbl["Age"] = team_data["age"].values
+            _rtbl["'26 Salary $M"] = team_data["salary_2026_M"].values
+            _rtbl["Contract"] = team_data.get("pay_contract", pd.Series(dtype=str)).values
+            _rtbl["FA Year"] = team_data.get("fa_year", pd.Series(dtype=float)).values
+            _rtbl["Bats"] = team_data.get("bats", pd.Series(dtype=str)).values
+            _rtbl["Throws"] = team_data.get("throws", pd.Series(dtype=str)).values
+
+            _show_restricted = st.checkbox("Include Restricted (minor league) players",
+                                           value=False, key="ta_show_restricted")
+            if not _show_restricted:
+                _rtbl = _rtbl[_rtbl["Status"] != "Restricted"].reset_index(drop=True)
+
+            _rtbl = _rtbl.sort_values("'26 Salary $M", ascending=False).reset_index(drop=True)
             _rtbl.insert(0, "#", range(1, len(_rtbl) + 1))
 
-            # Stage color coding
-            _STG_CLR = {"Pre-Arb": "#14532d", "Arb": "#2d1f0c", "FA": "#0c1a2d"}
+            _STG_CLR = {"Pre-Arb": "#14532d", "Arb": "#2d1f0c", "Guaranteed": "#0c1a2d"}
             def _stage_clr(row):
                 stg = str(row.get("Stage", ""))
+                if "IL" in str(row.get("Status", "")):
+                    return ["background-color:#2d0c0c;color:#fca5a5"] * len(row)
                 bg = _STG_CLR.get(stg, "")
-                if row.get("Status") == "60-Day IL":
-                    return [f"background-color:#2d0c0c;color:#fca5a5"] * len(row)
-                if bg:
-                    return [f"background-color:{bg}66"] * len(row)
-                return [""] * len(row)
+                return [f"background-color:{bg}66"] * len(row) if bg else [""] * len(row)
 
             _n_act = len(_rtbl[_rtbl["Status"] == "Active"])
-            _n_il = len(_rtbl[_rtbl["Status"] != "Active"])
-            st.markdown(f"##### 40-Man Roster ({_n_act} active, {_n_il} on IL)")
+            _n_il_d = len(_rtbl[_rtbl["Status"].str.contains("IL", na=False)])
+            st.markdown(f"##### 40-Man Roster ({_n_act} active, {_n_il_d} on IL)")
             st.markdown(
                 "<div style='font-size:0.78rem;color:#7a9ebc;margin-bottom:0.4rem;'>"
-                "Ranked by fWAR per $M (most efficient first). '25 fWAR = 2025 stats. '26 Salary = 2026 contract. Color: "
+                "Sorted by 2026 salary (highest first). Color: "
                 "<span style='color:#22c55e;'>Pre-Arb</span> · "
                 "<span style='color:#f59e0b;'>Arb</span> · "
-                "<span style='color:#3b82f6;'>FA</span> · "
+                "<span style='color:#3b82f6;'>Guaranteed</span> · "
                 "<span style='color:#fca5a5;'>IL</span></div>",
                 unsafe_allow_html=True,
             )
-            _fmt_dict = {"Age": "{:.0f}", "'26 Salary $M": "{:.1f}", "'25 fWAR": "{:.1f}",
-                         "fWAR/$M": "{:.2f}", "ERA": "{:.2f}", "HR": "{:.0f}"}
             st.dataframe(
                 _rtbl.style.apply(_stage_clr, axis=1).format(
-                    {k: v for k, v in _fmt_dict.items() if k in _rtbl.columns}, na_rep="—"),
+                    {"Age": "{:.0f}", "'26 Salary $M": "${:.2f}M", "FA Year": "{:.0f}"}, na_rep="—"),
                 hide_index=True, use_container_width=True,
                 height=min(60 + len(_rtbl) * 35, 700),
             )
         else:
-            st.info(f"No 40-man roster data available for {sel_team}.")
+            st.info(f"No roster data available for {sel_team}.")
 
     # ── Tab 2 — Rankings Position ────────────────────────────────────────
     with tt2:
@@ -8663,15 +8656,16 @@ def _render_team_analysis_page():
 
     # ── Tab 3 — Salary & Payroll ─────────────────────────────────────────
     with tt3:
-        if not team_pay.empty:
-            # Salary by stage
-            _stg_sal = team_pay.groupby("Stage_Clean")["Salary_M"].sum().reset_index()
-            _stg_colors = {"Pre-Arb": "#22c55e", "Arb": "#f59e0b", "FA": "#3b82f6"}
+        if not team_data.empty:
+            # Salary by stage from enriched data
+            _stg_col = "stage_display" if "stage_display" in team_data.columns else "contract_stage"
+            _stg_sal = team_data.groupby(_stg_col)["salary_2026_M"].sum().reset_index()
+            _stg_colors = {"Pre-Arb": "#22c55e", "Arb": "#f59e0b", "Guaranteed": "#3b82f6", "FA": "#94a3b8"}
 
             fig_stg = go.Figure(go.Pie(
-                labels=_stg_sal["Stage_Clean"],
-                values=_stg_sal["Salary_M"],
-                marker_colors=[_stg_colors.get(s, "#4a687e") for s in _stg_sal["Stage_Clean"]],
+                labels=_stg_sal[_stg_col],
+                values=_stg_sal["salary_2026_M"],
+                marker_colors=[_stg_colors.get(s, "#4a687e") for s in _stg_sal[_stg_col]],
                 hole=0.45,
                 textinfo="label+percent",
                 textfont=dict(color="#d6e8f8", size=11),
@@ -8684,46 +8678,51 @@ def _render_team_analysis_page():
             st.plotly_chart(fig_stg, use_container_width=True, config={"displayModeBar": False})
 
             # Top 10 highest paid
-            _top_sal = team_pay.nlargest(10, "Salary_M")[["Player", "Position", "Salary_M", "WAR_Total", "Stage_Clean"]].copy()
+            _top_sal = team_data.nlargest(10, "salary_2026_M")[["full_name", "position_primary", "salary_2026_M", "contract_stage"]].copy()
             _top_sal.insert(0, "#", range(1, len(_top_sal) + 1))
-            _top_sal.columns = ["#", "Player", "Pos", "Salary $M", "fWAR", "Stage"]
+            _top_sal.columns = ["#", "Player", "Pos", "Salary $M", "Stage"]
             st.markdown("##### Top 10 Highest-Paid Players")
             st.dataframe(
-                _top_sal.style.format({"Salary $M": "{:.1f}", "fWAR": "{:.1f}"}, na_rep="—"),
+                _top_sal.style.format({"Salary $M": "${:.2f}M"}, na_rep="—"),
                 hide_index=True, use_container_width=True,
             )
 
-            # Future payroll commitments (3-year)
-            st.markdown("##### 📅 Projected Payroll (2026–2028)")
-            _yr_cols = ["2026_total", "2027_total", "2028_total"]
-            _s26 = float(team_pay["Salary_M"].sum())
-            _s27 = float(team_pay["2027"].dropna().sum()) if "2027" in team_pay.columns else 0
-            _s28 = float(team_pay["2028"].dropna().sum()) if "2028" in team_pay.columns else 0
+            # Future payroll commitments (2026–2032)
+            st.markdown("##### 📅 Projected Payroll (2026–2032)")
+            _fut_years = []
+            for yr in range(2026, 2033):
+                col = f"salary_{yr}_M"
+                if col in team_data.columns:
+                    _fut_years.append((str(yr), float(team_data[col].sum())))
+            _s26 = _fut_years[0][1] if _fut_years else 0
+            _s27 = _fut_years[1][1] if len(_fut_years) > 1 else 0
+            _s28 = _fut_years[2][1] if len(_fut_years) > 2 else 0
 
             fig_proj = go.Figure()
             fig_proj.add_trace(go.Bar(
-                x=["2026", "2027", "2028"],
-                y=[_s26, _s27, _s28],
-                marker_color=["#3b82f6", "#60a5fa", "#93c5fd"],
-                text=[f"${v:.0f}M" for v in [_s26, _s27, _s28]],
+                x=[y[0] for y in _fut_years],
+                y=[y[1] for y in _fut_years],
+                marker_color=["#3b82f6", "#60a5fa", "#93c5fd", "#bfdbfe", "#dbeafe", "#e0e7ff", "#ede9fe"],
+                text=[f"${v:.0f}M" for _, v in _fut_years],
                 textposition="outside", textfont=dict(color="#d6e8f8"),
                 hovertemplate="%{x}: $%{y:.1f}M<extra></extra>",
             ))
             fig_proj.add_hline(y=244, line_dash="dash", line_color="#f59e0b", opacity=0.5,
                                annotation_text="CBT $244M", annotation_font_color="#f59e0b")
             fig_proj.update_layout(**_pt(
-                title=f"{_full_name} — Committed Payroll",
-                yaxis=dict(title="Total $M"), height=340,
+                title=f"{_full_name} — Committed Payroll (2026–2032)",
+                yaxis=dict(title="Total $M"), height=380,
             ))
             st.plotly_chart(fig_proj, use_container_width=True, config={"displayModeBar": False})
 
             st.caption(
-                "2026 reflects actual contracts. 2027–2028 include only confirmed multi-year commitments. "
-                "Players whose contracts expire show $0 for future years."
+                "2026 salaries reflect actual contracts and league minimum estimates. "
+                "Future years include guaranteed commitments plus projected arb raises. "
+                "Players hitting free agency show no salary for those years."
             )
 
             # CBT status
-            _cbt_lbl, _cbt_bg, _, _, _cbt_note = _cbt_info(_s26)
+            _cbt_lbl, _cbt_bg, _, _, _cbt_note = _cbt_info(_payroll_m)
             st.markdown(
                 f"<div style='background:{_cbt_bg};border-radius:8px;padding:10px 14px;"
                 f"font-size:0.85rem;color:#d6e8f8;margin-top:0.5rem;'>"
@@ -8741,8 +8740,26 @@ def _render_team_analysis_page():
             "line are underpaid (good value). Dots above are overpaid relative to production.</div>",
             unsafe_allow_html=True,
         )
-        if not team_pay.empty and "WAR_Total" in team_pay.columns and "Salary_M" in team_pay.columns:
-            _tp_plot = team_pay.dropna(subset=["WAR_Total", "Salary_M"]).copy()
+        # Merge with 2025 stats for fWAR scatter
+        _tp_plot = pd.DataFrame()
+        if not team_data.empty and "salary_2026_M" in team_data.columns:
+            try:
+                _stats_csv = _data_url("data/mlb_combined_2021_2025.csv")
+                _stats_all = _read_csv(_stats_csv, low_memory=False)
+                _stats_all.columns = [c.strip() for c in _stats_all.columns]
+                _stats_all["Year"] = pd.to_numeric(_stats_all["Year"], errors="coerce")
+                _stats_all["WAR_Total"] = pd.to_numeric(_stats_all.get("WAR_Total", pd.Series()), errors="coerce")
+                _stats_25 = _stats_all[_stats_all["Year"] == 2025][["Player", "WAR_Total"]].drop_duplicates("Player", keep="first")
+                _stats_25["_key"] = _stats_25["Player"].str.lower().str.strip()
+                _td = team_data.copy()
+                _td["_key"] = _td["full_name"].apply(_fix_player_name).str.lower().str.strip()
+                _td = _td.merge(_stats_25[["_key", "WAR_Total"]], on="_key", how="left")
+                _tp_plot = _td.dropna(subset=["WAR_Total", "salary_2026_M"]).copy()
+                _tp_plot = _tp_plot.rename(columns={"salary_2026_M": "Salary_M", "full_name": "Player",
+                                                     "stage_display": "Stage_Clean", "position_primary": "Position"})
+            except Exception:
+                pass
+        if not _tp_plot.empty:
             if len(_tp_plot) >= 3:
                 _stg_clrs = {"FA": "#3b82f6", "Arb": "#f59e0b", "Pre-Arb": "#22c55e"}
                 _tp_colors = [_stg_clrs.get(s, "#4a687e") for s in _tp_plot.get("Stage_Clean", [])]
