@@ -8435,7 +8435,7 @@ _TEAM_CITIES: dict[str, str] = {
 _TEAM_COLORS: dict[str, tuple[str, str, str]] = {
     "ARI": ("#a71930", "#e3d4ad", "#1a0810"), "ATH": ("#003831", "#efb21e", "#0a1a14"),
     "ATL": ("#ce1141", "#13274f", "#1a0810"), "BAL": ("#df4601", "#27251f", "#1a0f08"),
-    "BOS": ("#bd3039", "#0c2340", "#1a0c10"), "CHC": ("#0e3386", "#cc3433", "#081a2d"),
+    "BOS": ("#0c2340", "#bd3039", "#081420"), "CHC": ("#0e3386", "#cc3433", "#081a2d"),
     "CHW": ("#27251f", "#c4ced4", "#0e0e0d"), "CIN": ("#c6011f", "#000000", "#1a0810"),
     "CLE": ("#00385d", "#e31937", "#081420"), "COL": ("#33006f", "#c4ced4", "#10082a"),
     "DET": ("#0c2340", "#fa4616", "#081420"), "HOU": ("#002d62", "#eb6e1f", "#081420"),
@@ -8489,13 +8489,23 @@ def _render_team_analysis_page():
 
     # ── Team picker CSS ──────────────────────────────────────────────────
     st.markdown("""<style>
-    /* Compact team picker buttons */
-    div[data-testid="stHorizontalBlock"] [data-testid="stButton"] > button {
-        padding: 0.35rem 0.3rem !important;
-        font-size: 0.82rem !important;
-        min-height: 2.2rem !important;
-        border-radius: 6px !important;
+    .tp-card {
+        background: #111927;
+        border: 1px solid #1e3a5c;
+        border-radius: 8px;
+        padding: 10px 8px 8px;
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+        min-width: 90px;
     }
+    .tp-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .tp-abbr { font-size: 1.1rem; font-weight: 800; color: #e8f4ff; line-height: 1.2; }
+    .tp-name { font-size: 0.6rem; color: #7a9ebc; margin-top: 2px; }
+    .tp-league { font-size: 0.8rem; font-weight: 700; color: #93b8d8; text-transform: uppercase;
+                  letter-spacing: 0.12em; margin: 0.8rem 0 0.4rem; text-align: center; }
+    .tp-div { font-size: 0.68rem; color: #4a687e; margin-bottom: 0.3rem; font-weight: 600; }
+    .tp-row { display: flex; gap: 8px; margin-bottom: 6px; justify-content: center; flex-wrap: wrap; }
     </style>""", unsafe_allow_html=True)
 
     # ── Data loading (enriched roster = single source of truth) ─────────
@@ -8505,7 +8515,7 @@ def _render_team_analysis_page():
     except Exception:
         detail_df = pd.DataFrame()
 
-    # ── Team selector — visual grid by division ────────────────────────
+    # ── Team selector — visual card grid by league & division ───────────
     _DIVISIONS = {
         "American League": {
             "AL East":    ["BAL", "BOS", "NYY", "TBR", "TOR"],
@@ -8519,46 +8529,48 @@ def _render_team_analysis_page():
         },
     }
 
-    # Get or initialize selected team
     if "team_analysis_sel" not in st.session_state:
         st.session_state["team_analysis_sel"] = "NYY"
     sel_team = st.session_state["team_analysis_sel"]
 
-    # Render team picker grid
     for league, divisions in _DIVISIONS.items():
-        st.markdown(
-            f"<div style='font-size:0.75rem;font-weight:700;color:#7a9ebc;text-transform:uppercase;"
-            f"letter-spacing:0.1em;margin:0.6rem 0 0.3rem;'>{league}</div>",
-            unsafe_allow_html=True,
-        )
-        for div_name, div_teams in divisions.items():
-            cols = st.columns([1.2] + [1] * len(div_teams))
-            with cols[0]:
-                st.markdown(
-                    f"<div style='font-size:0.65rem;color:#4a687e;padding-top:0.6rem;'>{div_name}</div>",
-                    unsafe_allow_html=True,
-                )
-            for i, tm in enumerate(div_teams):
-                tc_p, tc_a, tc_d = _TEAM_COLORS.get(tm, ("#3b82f6", "#93c5fd", "#081420"))
-                is_active = tm == sel_team
-                _border = f"2px solid {tc_p}" if is_active else f"1px solid {tc_p}44"
-                _bg = tc_d if is_active else "#111927"
-                _shadow = f"0 0 12px {tc_p}40" if is_active else "none"
-                with cols[i + 1]:
-                    if st.button(
-                        f"**{tm}**",
-                        key=f"tpick_{tm}",
-                        use_container_width=True,
-                    ):
-                        st.session_state["team_analysis_sel"] = tm
-                        st.rerun()
-                    # Style overlay for the button
-                    st.markdown(
-                        f"<div style='margin-top:-0.5rem;text-align:center;font-size:0.58rem;"
-                        f"color:{tc_a if is_active else '#4a687e'};'>"
-                        f"{_ABBR_TO_FULL.get(tm, tm)}</div>",
-                        unsafe_allow_html=True,
-                    )
+        st.markdown(f"<div class='tp-league'>{league}</div>", unsafe_allow_html=True)
+
+        # Two divisions side by side per row
+        div_names = list(divisions.keys())
+        for di in range(0, len(div_names), 2):
+            d_cols = st.columns(2, gap="large")
+            for ci in range(2):
+                if di + ci >= len(div_names):
+                    break
+                dname = div_names[di + ci]
+                dteams = divisions[dname]
+                with d_cols[ci]:
+                    st.markdown(f"<div class='tp-div'>{dname}</div>", unsafe_allow_html=True)
+                    tcols = st.columns(len(dteams))
+                    for ti, tm in enumerate(dteams):
+                        tc_p, tc_a, tc_d = _TEAM_COLORS.get(tm, ("#3b82f6", "#93c5fd", "#081420"))
+                        is_active = tm == sel_team
+                        if is_active:
+                            _bg = "#18243a"
+                            _bdr = "#3b82f6"
+                            _abbr_clr = "#d6e8f8"
+                            _name_clr = "#93b8d8"
+                        else:
+                            _bg = tc_d
+                            _bdr = tc_p
+                            _abbr_clr = tc_a
+                            _name_clr = f"{tc_a}aa"
+                        with tcols[ti]:
+                            if st.button(tm, key=f"tpick_{tm}", use_container_width=True):
+                                st.session_state["team_analysis_sel"] = tm
+                                st.rerun()
+                            st.markdown(
+                                f"<div style='margin-top:-0.6rem;text-align:center;"
+                                f"font-size:0.58rem;color:{_name_clr};'>"
+                                f"{_ABBR_TO_FULL.get(tm, tm)}</div>",
+                                unsafe_allow_html=True,
+                            )
 
     _full_name = f"{_TEAM_CITIES.get(sel_team, '')} {_ABBR_TO_FULL.get(sel_team, sel_team)}"
 
