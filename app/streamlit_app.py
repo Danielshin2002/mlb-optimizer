@@ -1220,8 +1220,8 @@ def _load_enriched_roster() -> pd.DataFrame:
         df.loc[df["position_primary"].isin(["nan", "None", ""]), "position_primary"] = pd.NA
 
     # Clean stage display
-    _stg_map = {"Guaranteed": "Guaranteed", "Arb-Eligible": "Arb",
-                "Arb": "Arb", "Pre-Arb": "Pre-Arb", "FA": "FA", "Off 40-Man": "Off 40-Man"}
+    _stg_map = {"Guaranteed": "Free Agent", "Arb-Eligible": "Arb",
+                "Arb": "Arb", "Pre-Arb": "Pre-Arb", "FA": "Free Agent", "Off 40-Man": "Off 40-Man"}
     if "contract_stage" in df.columns:
         df["stage_display"] = df["contract_stage"].map(_stg_map).fillna("—")
 
@@ -8182,18 +8182,19 @@ def _render_rankings_page():
                 if idx < _tier_size * 3: return "Average"
                 if idx < _tier_size * 4: return "Below Average"
                 return "Bottom"
-            _eff_tbl["Ranking"] = [_rank_tier(i) for i in range(len(_eff_tbl))]
+            _eff_tbl["Efficiency Tier"] = [_rank_tier(i) for i in range(len(_eff_tbl))]
+            _eff_tbl.insert(0, "#", range(1, len(_eff_tbl) + 1))
 
             _RANK_CLR = {"Top Tier": "#14532d", "Above Average": "#1a3a20",
                          "Average": "", "Below Average": "#2d1f0c", "Bottom": "#2d0c0c"}
             def _tier_clr(row):
-                bg = _RANK_CLR.get(row.get("Ranking", ""), "")
+                bg = _RANK_CLR.get(row.get("Efficiency Tier", ""), "")
                 return [f"background-color:{bg}"] * len(row) if bg else [""] * len(row)
 
-            _eff_disp = _eff_tbl.rename(columns={
+            # Drop the old Tier column, keep Efficiency Tier
+            _eff_disp = _eff_tbl.drop(columns=["Tier"], errors="ignore").rename(columns={
                 "Avg_Gap": "Avg Gap ($M)", "Playoff_Apps": "Playoff Apps",
                 "WS_Apps": "WS Appearances", "WS_Wins": "WS Wins",
-                "Tier": "Efficiency Tier",
             })
             st.dataframe(
                 _eff_disp.style.apply(_tier_clr, axis=1).format(
@@ -8639,11 +8640,11 @@ def _render_team_analysis_page():
                 tbl.insert(0, "#", range(1, len(tbl) + 1))
                 return tbl
 
-            _STG_CLR = {"Pre-Arb": "#14532d", "Arb": "#0c2a2a", "Guaranteed": "#0c1a2d", "Free Agent": "#1a0c28"}
+            _STG_CLR = {"Pre-Arb": "#1a6b3a", "Arb": "#0c2a2a", "Guaranteed": "#0c1a2d", "Free Agent": "#0c1a2d"}
             def _stage_clr(row):
                 stg = str(row.get("Stage", ""))
                 bg = _STG_CLR.get(stg, "")
-                return [f"background-color:{bg}66"] * len(row) if bg else [""] * len(row)
+                return [f"background-color:{bg}55"] * len(row) if bg else [""] * len(row)
 
             _fmt = {"Age": "{:.0f}", "'26 Salary $M": "${:.2f}M", "'25 fWAR": "{:.1f}"}
 
@@ -8660,10 +8661,9 @@ def _render_team_analysis_page():
             st.markdown(
                 "<div style='font-size:0.78rem;color:#7a9ebc;margin-bottom:0.4rem;'>"
                 "Sorted by 2026 salary. Color: "
-                "<span style='color:#22c55e;'>Pre-Arb</span> · "
+                "<span style='color:#4ade80;'>Pre-Arb</span> · "
                 "<span style='color:#14b8a6;'>Arb</span> · "
-                "<span style='color:#3b82f6;'>Guaranteed</span> · "
-                "<span style='color:#9333ea;'>Free Agent</span></div>",
+                "<span style='color:#60a5fa;'>Free Agent</span></div>",
                 unsafe_allow_html=True,
             )
             if not _active_df.empty:
@@ -8774,7 +8774,7 @@ def _render_team_analysis_page():
             # Salary by stage from enriched data
             _stg_col = "stage_display" if "stage_display" in team_data.columns else "contract_stage"
             _stg_sal = team_data.groupby(_stg_col)["salary_2026_M"].sum().reset_index()
-            _stg_colors = {"Pre-Arb": "#22c55e", "Arb": "#f59e0b", "Guaranteed": "#3b82f6", "FA": "#94a3b8"}
+            _stg_colors = {"Pre-Arb": "#4ade80", "Arb": "#14b8a6", "Free Agent": "#60a5fa", "Off 40-Man": "#94a3b8"}
 
             fig_stg = go.Figure(go.Pie(
                 labels=_stg_sal[_stg_col],
