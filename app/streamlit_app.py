@@ -5855,11 +5855,10 @@ justify-content:space-between;gap:16px;flex-wrap:wrap;">
         _mlb_ids = _cached_mlbam_lookup(_RAZZBALL_PATH)
 
         # ── Tabs ──────────────────────────────────────────────────────────
-        t1, t2, t3, t4, t5, t6, t7, t8 = st.tabs([
+        t1, t2, t3, t5, t6, t7, t8 = st.tabs([
             "Cost Effective Line",
             "PPEL",
             "Age Trajectory",
-            "By Team",
             "Efficient Players",
             "Residual Analysis",
             "Pre-Arb Explorer",
@@ -6289,29 +6288,6 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                 }).apply(lambda row: ["background-color:#0c221866"] * len(row) if row["#"] <= 5 else [""] * len(row), axis=1),
                 hide_index=True, use_container_width=True, height=min(60 + 25 * 35, 720),
             )
-
-        # ── Tab 4 — By Team ───────────────────────────────────────────────
-        with t4:
-            _avail_t = sorted(df["Team"].unique())
-            _def_t   = _avail_t[:min(4, len(_avail_t))]
-            _sel_t   = st.multiselect("Teams", _avail_t, default=_def_t, key="ef_team_sel")
-            if not _sel_t:
-                st.info("Select at least one team.")
-            else:
-                fig4 = go.Figure()
-                for _tn, _tg in df[df["Team"].isin(_sel_t)].groupby("Team"):
-                    fig4.add_trace(go.Scatter(
-                        x=_tg["WAR_Total"], y=_tg["Salary_M"],
-                        mode="markers", name=_tn, marker=dict(size=8),
-                        text=_tg["Player"] + " (" + _tg["Year"].astype(str) + ")",
-                        hovertemplate="%{text}<br>WAR: %{x:.1f}  Salary: $%{y:.2f}M<extra></extra>",
-                    ))
-                fig4.update_layout(**_pt(
-                    title="WAR vs Salary by Team",
-                    xaxis=dict(title="WAR"), yaxis=dict(title="Salary ($M)"),
-                    height=640, showlegend=True,
-                ))
-                st.plotly_chart(fig4, use_container_width=True)
 
         # ── Tab 5 — Efficient Players ─────────────────────────────────────
         with t5:
