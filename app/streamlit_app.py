@@ -2702,8 +2702,7 @@ def _render_home_page():
          "All 30 MLB teams ranked by efficiency, fWAR, payroll, and win performance. "
          "See which franchises get the most wins per dollar and which are overspending."),
         ("team",      "🏟️", "Team Analysis",
-         "Deep dive into any MLB team. Roster breakdown, salary commitments, "
-         "efficiency rankings, fWAR leaders, IL status, and 3 year payroll projections."),
+         "Deep dive into the spending efficiency of your favorite team."),
         ("league",    "📊", "Player Analysis",
          "Player-level cost effective line, PPEL regression, fWAR stability ratings, "
          "and age trajectory analysis across 4,000+ player-seasons."),
@@ -8607,8 +8606,16 @@ def _render_team_analysis_page():
         _eff_rank = int(all_eff_2025["dollar_gap_M"].rank().loc[all_eff_2025["Team"] == sel_team].values[0])
         _war_rank = int(all_eff_2025["team_WAR"].rank(ascending=False).loc[all_eff_2025["Team"] == sel_team].values[0])
         _pay_rank = int(all_eff_2025["payroll_M"].rank(ascending=False).loc[all_eff_2025["Team"] == sel_team].values[0])
+        # League-specific efficiency rank
+        _team_league = all_eff_2025.loc[all_eff_2025["Team"] == sel_team, "league"].values
+        _team_lg = str(_team_league[0]) if len(_team_league) > 0 else "?"
+        _lg_df = all_eff_2025[all_eff_2025["league"] == _team_lg] if _team_lg != "?" else pd.DataFrame()
+        _lg_rank = int(_lg_df["dollar_gap_M"].rank().loc[_lg_df["Team"] == sel_team].values[0]) if not _lg_df.empty and sel_team in _lg_df["Team"].values else 0
+        _lg_total = len(_lg_df) if not _lg_df.empty else 15
     else:
-        _eff_rank = _war_rank = _pay_rank = 0
+        _eff_rank = _war_rank = _pay_rank = _lg_rank = 0
+        _team_lg = "?"
+        _lg_total = 15
 
     _dpw = round(_payroll_m / max(_war, 0.1), 1)
 
@@ -8663,10 +8670,15 @@ def _render_team_analysis_page():
         f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_war:.1f}</div>"
         f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_war_rank}/30</div></div>"
         f"<div style='{_kpi}'>"
-        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>Efficiency</div>"
+        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>{'Surplus Value' if _gap < 0 else 'Lost Value'}</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:{'#22c55e' if _gap < 0 else '#ef4444'};'>"
-        f"{'$' + str(int(_gap)) + 'M' if _gap <= 0 else '+$' + str(int(_gap)) + 'M'}</div>"
+        f"{'$' + str(abs(int(_gap))) + 'M' if _gap < 0 else '$' + str(int(_gap)) + 'M'}</div>"
         f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_eff_rank}/30</div></div>"
+        f"<div style='{_kpi}'>"
+        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>Spend Efficiency</div>"
+        f"<div style='font-size:1rem;font-weight:700;color:#e8f4ff;'>"
+        f"#{_eff_rank} <span style='font-size:0.7rem;color:#7a9ebc;'>MLB</span></div>"
+        f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_lg_rank}/{_lg_total} {_team_lg}</div></div>"
         f"<div style='{_kpi}'>"
         f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>$/fWAR</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>${_dpw:.1f}M</div></div>"
@@ -8816,8 +8828,8 @@ def _render_team_analysis_page():
             ))
             _abs_max = max(abs(_rk["dollar_gap_M"].max()), abs(_rk["dollar_gap_M"].min())) * 1.15
             fig_rk.update_layout(**_pt(
-                title=f"2025 Efficiency Ranking — {_full_name} is #{_eff_rank}",
-                xaxis=dict(title="$ Gap ($M) — negative = efficient",
+                title=f"2025 Spend Efficiency Ranking — {_full_name} is #{_eff_rank}",
+                xaxis=dict(title="Surplus Value ($M) — negative = surplus, positive = lost value",
                            zeroline=True, zerolinecolor="#4a687e", zerolinewidth=1,
                            range=[-_abs_max, _abs_max]),
                 yaxis=dict(autorange="reversed"),
@@ -8852,14 +8864,24 @@ def _render_team_analysis_page():
     # ── Tab 3 — Salary & Payroll ─────────────────────────────────────────
     with tt3:
         if not team_data.empty:
+            # Year toggle: compare 2025 vs 2026 salary levels
+            _sal_year = st.radio(
+                "Salary Year", ["2026", "2025"], horizontal=True,
+                key="ta_sal_year", index=0,
+            )
+            _sal_col = f"salary_{_sal_year}_M"
+            if _sal_col not in team_data.columns or team_data[_sal_col].isna().all():
+                _sal_col = "salary_2026_M"  # fallback
+                st.caption(f"No {_sal_year} salary data available — showing 2026.")
+
             # Salary by stage from enriched data
             _stg_col = "stage_display" if "stage_display" in team_data.columns else "contract_stage"
-            _stg_sal = team_data.groupby(_stg_col)["salary_2026_M"].sum().reset_index()
+            _stg_sal = team_data.groupby(_stg_col)[_sal_col].sum().reset_index()
             _stg_colors = {"Pre-Arb": "#4ade80", "Arb": "#14b8a6", "Free Agent": "#60a5fa", "Off 40-Man": "#94a3b8"}
 
             fig_stg = go.Figure(go.Pie(
                 labels=_stg_sal[_stg_col],
-                values=_stg_sal["salary_2026_M"],
+                values=_stg_sal[_sal_col],
                 marker_colors=[_stg_colors.get(s, "#4a687e") for s in _stg_sal[_stg_col]],
                 hole=0.45,
                 textinfo="label+percent",
@@ -8867,16 +8889,16 @@ def _render_team_analysis_page():
                 hovertemplate="%{label}: $%{value:.1f}M<extra></extra>",
             ))
             fig_stg.update_layout(**_pt(
-                title="2026 Payroll by Contract Stage",
+                title=f"{_sal_year} Payroll by Contract Stage",
                 height=360, showlegend=False,
             ))
             st.plotly_chart(fig_stg, use_container_width=True, config={"displayModeBar": False})
 
             # Top 10 highest paid
-            _top_sal = team_data.nlargest(10, "salary_2026_M")[["full_name", "position_primary", "salary_2026_M", "contract_stage"]].copy()
+            _top_sal = team_data.nlargest(10, _sal_col)[["full_name", "position_primary", _sal_col, "contract_stage"]].copy()
             _top_sal.insert(0, "#", range(1, len(_top_sal) + 1))
             _top_sal.columns = ["#", "Player", "Pos", "Salary $M", "Stage"]
-            st.markdown("##### Top 10 Highest-Paid Players")
+            st.markdown(f"##### Top 10 Highest-Paid Players ({_sal_year})")
             st.dataframe(
                 _top_sal.style.format({"Salary $M": "${:.2f}M"}, na_rep="—"),
                 hide_index=True, use_container_width=True,
@@ -9072,7 +9094,7 @@ def _render_team_analysis_page():
             ))
             _abs_max_g = max(abs(_te["dollar_gap_M"]).max(), 10) * 1.3
             fig_gap.update_layout(**_pt(
-                title=f"{_full_name} — Efficiency Gap by Season",
+                title=f"{_full_name} — Surplus / Lost Value by Season",
                 xaxis=dict(title="Season"),
                 yaxis=dict(title="$ Gap ($M)", zeroline=True, zerolinecolor="#4a687e",
                            range=[-_abs_max_g, _abs_max_g]),
@@ -9108,11 +9130,11 @@ def _render_team_analysis_page():
             # Summary table
             st.markdown("##### Season-by-Season Summary")
             _sum = _te[["Year", "Wins", "payroll_M", "team_WAR", "dollar_gap_M", "in_playoffs"]].copy()
-            _sum.columns = ["Year", "Wins", "Payroll $M", "fWAR", "Gap $M", "Postseason"]
+            _sum.columns = ["Year", "Wins", "Payroll $M", "fWAR", "Value $M", "Postseason"]
             _sum["Year"] = _sum["Year"].astype(int)
             _sum["Postseason"] = _sum["Postseason"].map({True: "✓", False: ""})
             st.dataframe(
-                _sum.style.format({"Payroll $M": "{:.0f}", "fWAR": "{:.1f}", "Gap $M": "{:+.0f}"}, na_rep="—"),
+                _sum.style.format({"Payroll $M": "{:.0f}", "fWAR": "{:.1f}", "Value $M": "{:+.0f}"}, na_rep="—"),
                 hide_index=True, use_container_width=True,
             )
         else:
