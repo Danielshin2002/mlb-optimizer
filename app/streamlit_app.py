@@ -8470,6 +8470,8 @@ _MLB_TEAM_ID_MAP: dict[int, str] = {
 @st.cache_data(ttl=86400, show_spinner=False)
 def _fetch_2026_standings() -> dict[str, tuple[int, int]]:
     """Fetch current 2026 W-L records from MLB Stats API. Cached for 24 hours."""
+    if not _requests_available:
+        return {}
     try:
         resp = _requests.get(
             "https://statsapi.mlb.com/api/v1/standings"
@@ -8613,41 +8615,63 @@ def _render_team_analysis_page():
     # Team colors
     _tc_primary, _tc_accent, _tc_dark = _TEAM_COLORS.get(sel_team, ("#3b82f6", "#93c5fd", "#081420"))
 
+    # Team logo URL from R2
+    _LOGO_NAMES = {
+        "ARI": "Arizona Diamondbacks", "ATH": "Oakland Athletics", "ATL": "Atlanta Braves",
+        "BAL": "Baltimore Orioles", "BOS": "Boston Red Sox", "CHC": "Chicago Cubs",
+        "CHW": "Chicago White Sox", "CIN": "Cincinnati Reds", "CLE": "Cleveland Guardians",
+        "COL": "Colorado Rockies", "DET": "Detroit Tigers", "HOU": "Houston Astros",
+        "KCR": "Kansas City Royals", "LAA": "Los Angeles Angels", "LAD": "Los Angeles Dodgers",
+        "MIA": "Miami Marlins", "MIL": "Milwaukee Brewers", "MIN": "Minnesota Twins",
+        "NYM": "New York Mets", "NYY": "New York Yankees", "PHI": "Philadelphia Phillies",
+        "PIT": "Pittsburgh Pirates", "SDP": "San Diego Padres", "SEA": "Seattle Mariners",
+        "SFG": "San Francisco Giants", "STL": "St. Louis Cardinals", "TBR": "Tampa Bay Rays",
+        "TEX": "Texas Rangers", "TOR": "Toronto Blue Jays", "WSN": "Washington Nationals",
+    }
+    _logo_file = _LOGO_NAMES.get(sel_team, _full_name)
+    _logo_url = _data_url(f"logos/{_logo_file}.png")
+
     # Live 2026 record from MLB API (cached 24h)
     _standings = _fetch_2026_standings()
     _w26, _l26 = _standings.get(sel_team, (0, 0))
     _record_26 = f"{_w26}–{_l26}" if (_w26 + _l26) > 0 else "—"
 
+    # KPI box style — consistent background, white border
+    _kpi = ("background:#0d1b2a;border:1px solid #ffffff33;border-radius:8px;"
+            "padding:8px 14px;text-align:center;")
+
     st.markdown(
         f"<div style='background:linear-gradient(135deg,{_tc_dark},{_tc_dark}cc);border:1px solid {_tc_primary}44;"
         f"border-left:4px solid {_tc_primary};border-radius:10px;padding:16px 20px;margin-bottom:14px;'>"
-        f"<div style='font-size:1.4rem;font-weight:800;color:#e8f4ff;margin-bottom:8px;'>"
-        f"{_full_name}</div>"
+        f"<div style='display:flex;align-items:center;gap:14px;margin-bottom:10px;'>"
+        f"<img src='{_logo_url}' width='48' height='48' style='object-fit:contain;' onerror=\"this.style.display='none'\">"
+        f"<div style='font-size:1.4rem;font-weight:800;color:#e8f4ff;'>{_full_name}</div>"
+        f"</div>"
         f"<div style='display:flex;flex-wrap:wrap;gap:12px;'>"
-        f"<div style='background:{_tc_dark};border:1px solid {_tc_primary}33;border-radius:8px;padding:8px 14px;text-align:center;'>"
+        f"<div style='{_kpi}'>"
         f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>2025 Record</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_wins}W</div></div>"
-        f"<div style='background:{_tc_dark};border:1px solid {_tc_primary}33;border-radius:8px;padding:8px 14px;text-align:center;'>"
+        f"<div style='{_kpi}'>"
         f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>2026 Record</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_record_26}</div></div>"
-        f"<div style='background:{_tc_dark};border:1px solid {_tc_primary}33;border-radius:8px;padding:8px 14px;text-align:center;'>"
+        f"<div style='{_kpi}'>"
         f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>2026 Payroll</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>${_payroll_m:.0f}M</div>"
         f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_pay_rank}/30</div></div>"
-        f"<div style='background:{_tc_dark};border:1px solid {_tc_primary}33;border-radius:8px;padding:8px 14px;text-align:center;'>"
+        f"<div style='{_kpi}'>"
         f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>Team fWAR</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_war:.1f}</div>"
         f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_war_rank}/30</div></div>"
-        f"<div style='background:{_tc_dark};border:1px solid {_tc_primary}33;border-radius:8px;padding:8px 14px;text-align:center;'>"
+        f"<div style='{_kpi}'>"
         f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>Efficiency</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:{'#22c55e' if _gap < 0 else '#ef4444'};'>"
         f"{'$' + str(int(_gap)) + 'M' if _gap <= 0 else '+$' + str(int(_gap)) + 'M'}</div>"
         f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_eff_rank}/30</div></div>"
-        f"<div style='background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;'>"
-        f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>$/fWAR</div>"
+        f"<div style='{_kpi}'>"
+        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>$/fWAR</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>${_dpw:.1f}M</div></div>"
-        f"<div style='background:#0d1b2a;border:1px solid #1e3a5c;border-radius:8px;padding:8px 14px;text-align:center;'>"
-        f"<div style='font-size:10px;color:#7a9ebc;text-transform:uppercase;'>40-Man Roster</div>"
+        f"<div style='{_kpi}'>"
+        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>40-Man Roster</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{n_active} <span style='font-size:0.7rem;color:#7a9ebc;'>active</span>"
         f" · {n_il} <span style='font-size:0.7rem;color:#ef4444;'>IL</span></div></div>"
         f"</div></div>",
