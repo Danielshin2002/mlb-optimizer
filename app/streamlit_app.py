@@ -6142,8 +6142,10 @@ padding:12px 16px;margin-top:4px;">
     </div>
     <div>
       <span style="font-weight:700;color:#a8c8e8;">PPR (Pay-Performance Ratio)</span><br>
-      Actual salary ÷ model-predicted salary.
-      PPR &lt; 1 = underpaid · PPR &gt; 1 = overpaid · PPR = 1 = fair market.
+      Actual salary ÷ model-predicted salary.<br>
+      PPR &lt; 1 = underpaid<br>
+      PPR &gt; 1 = overpaid<br>
+      PPR = 1 = fair market.
     </div>
   </div>
 </div>""", unsafe_allow_html=True)
