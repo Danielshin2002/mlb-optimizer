@@ -5746,6 +5746,10 @@ div[data-testid='column']:first-of-type .stSlider{
             for _k in [k for k in st.session_state if k.startswith("ef_") and k not in _keep]:
                 del st.session_state[_k]
             st.rerun()
+        if st.button("✕  Clear All Filters", use_container_width=True, key="ef_clear_btn"):
+            for _k in ("ef_years", "ef_teams", "ef_stages"):
+                st.session_state[_k] = []
+            st.rerun()
 
     with col_m:
         # ── Apply filters ─────────────────────────────────────────────────
@@ -6289,7 +6293,7 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                 _age_top.style.format({
                     "fWAR": "{:.1f}", "Salary $M": "{:.1f}", "fWAR/$M": "{:.2f}",
                 }).apply(lambda row: ["background-color:#0c221866"] * len(row) if row["#"] <= 5 else [""] * len(row), axis=1),
-                hide_index=True, use_container_width=True, height=min(60 + 25 * 35, 720),
+                hide_index=True, use_container_width=True, height=385,
             )
 
         # ── Tab 5 — Efficient Players ─────────────────────────────────────
@@ -6320,7 +6324,7 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                     .format({"WAR":"{:.1f}","Actual $M":"${:.2f}M","Expected $M":"${:.2f}M",
                              "Residual $M":"${:+.2f}M","PPR":"{:.3f}","$/WAR":"${:.2f}M","Age":"{:.0f}"}, na_rep="—")
                     .map(_clr_ppr, subset=["PPR"]),
-                use_container_width=True, hide_index=True, height=600,
+                use_container_width=True, hide_index=True, height=480,
             )
 
         # ── Tab 6 — Residual Analysis ─────────────────────────────────────
@@ -6806,6 +6810,25 @@ display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
   </div>
 </div>""", unsafe_allow_html=True)
 
+                # ── Player search filter ──────────────────────────────────
+                _pa_search_col, _pa_reset_col = st.columns([3, 1])
+                with _pa_search_col:
+                    _pa_all_players = sorted(_pa_summary["Player"].unique())
+                    _pa_player_sel = st.multiselect(
+                        "Filter by player(s)", _pa_all_players,
+                        placeholder="Type or select player names…",
+                        key="ef_pa_player_sel",
+                    )
+                with _pa_reset_col:
+                    st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                    if st.button("↺  Reset", use_container_width=True, key="ef_pa_player_reset"):
+                        st.session_state["ef_pa_player_sel"] = []
+                        st.rerun()
+
+                if _pa_player_sel:
+                    _pa_df      = _pa_df[_pa_df["Player"].isin(_pa_player_sel)]
+                    _pa_summary = _pa_summary[_pa_summary["Player"].isin(_pa_player_sel)]
+
                 # WAR trajectory lines, one per player, coloured by trend
                 fig_pa = go.Figure()
                 _trend_map = dict(zip(_pa_summary["Player"], _pa_summary["Trend"]))
@@ -6841,6 +6864,8 @@ display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
                     legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="right", x=1),
                 ))
                 st.plotly_chart(fig_pa, use_container_width=True)
+                if st.button("↺  Reset Legend Filter", key="ef_pa_reset_legend"):
+                    st.rerun()
 
                 # Ranked summary table
                 _pa_disp = (
@@ -6867,7 +6892,7 @@ display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
                              "Total WAR": "{:.1f}", "Last Sal ($M)": "${:.2f}M",
                              "Age": "{:.0f}"}, na_rep="—")
                     .map(_clr_trend, subset=["Trend"]),
-                    use_container_width=True, hide_index=True, height=500,
+                    use_container_width=True, hide_index=True, height=410,
                 )
                 st.caption(
                     f"SD threshold = {_pa_sd_thresh:.2f} × global SD ({_pa_sd_global:.2f} WAR/yr).  "
