@@ -1950,7 +1950,7 @@ button[data-testid="stMultiSelectClearButton"] { display: none !important; }
         + _a('team', '🏟️ Team Analysis')
         + _a('league', '📊 Player Analysis')
         + _a('simulator', '🎮 Roster Simulator')
-        + _a('glossary', '📖 Glossary')
+        + _a('glossary', '📖 Methodology')
         + '<a href="https://docs.google.com/forms/d/e/1FAIpQLSdexY0xhRoQt3F6LVJHdZ7z4_nHeZZIL7Bn8bFrIaqmsTb0Pw/viewform?usp=publish-editor" '
         + 'target="_blank" style="color:#3b82f6;text-decoration:none;font-size:0.82rem;'
         + 'padding:0.35rem 0.7rem;margin-left:0.5rem;border:1px solid #2e4a62;border-radius:6px;'
@@ -2708,9 +2708,6 @@ def _render_home_page():
          "and age trajectory analysis across 4,000+ player-seasons."),
         ("simulator", "🎮", "Roster Simulator",
          "Build customized MLB rosters to optimize pay vs performance efficiency."),
-        ("glossary",  "📖", "Glossary & Methodology",
-         "Every metric explained in detail — fWAR, PPEL, CBT thresholds, WSR, "
-         "efficiency formulas, roster grades, and how we calculate each one."),
     ]
 
     # ------------------------------------------------------------------
@@ -2813,7 +2810,7 @@ def _render_home_page():
     /* card grid inside wrapper */
     .h-grid {
         display: grid;
-        grid-template-columns: repeat(5, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: 1rem;
         width: 100%;
         max-width: 1300px;
@@ -4113,7 +4110,7 @@ def _render_simulator_page():
                                        annotation_text=f"Budget ${budget_M}M", annotation_position="bottom right",
                                        annotation_font_color="#3b82f6")
                     _fig_fut.update_layout(**_pt(
-                        title="Projected Payroll by Stage (2026–2028)",
+                        title="Committed Payroll by Stage (2026–2028)",
                         yaxis=dict(title="Total $M"), height=340,
                         barmode="stack", showlegend=True,
                         legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
@@ -7809,7 +7806,7 @@ def _render_rankings_page():
             "🔴", "LEAST EFFICIENT",
             _full(_worst_eff),
             f"${_worst_eff['dollar_gap_M']:.0f}M above the line",
-            "#280c0c",
+            "#3d1f00",
             "This team spent the most payroll $ for level of wins earned",
         ), unsafe_allow_html=True)
     with qa5:
@@ -8081,6 +8078,38 @@ def _render_rankings_page():
             _rk.style.apply(_rk_clr, axis=1),
             hide_index=True, use_container_width=True, height=680,
         )
+
+    # ══════════════════════════════════════════════════════════════════════
+    # Player Rankings — Top 25 by fWAR
+    # ══════════════════════════════════════════════════════════════════════
+    st.markdown("---")
+    st.markdown("### Player Rankings")
+    st.markdown(
+        "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
+        f"Top 25 individual players by fWAR for the <b>{sel_year}</b> season.</div>",
+        unsafe_allow_html=True,
+    )
+    try:
+        _pr_csv = _data_url("data/mlb_combined_2021_2025.csv")
+        _pr_df = _read_csv(_pr_csv)
+        _pr_df["Year"] = pd.to_numeric(_pr_df["Year"], errors="coerce")
+        _pr_df["WAR_Total"] = pd.to_numeric(_pr_df["WAR_Total"], errors="coerce")
+        _pr_df["Salary_M"] = pd.to_numeric(_pr_df["Salary_M"], errors="coerce")
+        _pr_yr = _pr_df[_pr_df["Year"] == sel_year].copy()
+        _pr_yr = _pr_yr.dropna(subset=["WAR_Total"]).sort_values("WAR_Total", ascending=False).head(25)
+        if not _pr_yr.empty:
+            _pr_show = _pr_yr[["Player", "Team", "Position", "WAR_Total", "Salary_M"]].reset_index(drop=True)
+            _pr_show.insert(0, "#", range(1, len(_pr_show) + 1))
+            _pr_show = _pr_show.rename(columns={
+                "WAR_Total": "fWAR", "Salary_M": "Salary $M",
+            })
+            _pr_show["Salary $M"] = _pr_show["Salary $M"].round(1)
+            _pr_show["fWAR"] = _pr_show["fWAR"].round(1)
+            st.dataframe(_pr_show, hide_index=True, use_container_width=True, height=500)
+        else:
+            st.info(f"No player data available for {sel_year}.")
+    except Exception as _pr_e:
+        st.warning(f"Could not load player rankings: {_pr_e}")
 
     # ══════════════════════════════════════════════════════════════════════
     # Feature 1 — "Does WAR Translate to Wins?"
@@ -8563,9 +8592,9 @@ def _render_team_analysis_page():
 
     al_col, nl_col = st.columns(2, gap="medium")
     with al_col:
-        _render_league_grid("AL", _AL_DIVS)
+        _render_league_grid("American League", _AL_DIVS)
     with nl_col:
-        _render_league_grid("NL", _NL_DIVS)
+        _render_league_grid("National League", _NL_DIVS)
 
     # Spacer between team picker and header card
     st.markdown("<div style='margin-top:1.2rem;'></div>", unsafe_allow_html=True)
@@ -8687,10 +8716,6 @@ def _render_team_analysis_page():
         f"<div style='{_kpi}'>"
         f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>$/fWAR</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>${_dpw:.1f}M</div></div>"
-        f"<div style='{_kpi}'>"
-        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>40-Man Roster</div>"
-        f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{n_active} <span style='font-size:0.7rem;color:#7a9ebc;'>active</span>"
-        f" · {n_il} <span style='font-size:0.7rem;color:#ef4444;'>IL</span></div></div>"
         f"</div></div>",
         unsafe_allow_html=True,
     )
@@ -8910,7 +8935,7 @@ def _render_team_analysis_page():
             )
 
             # Future payroll commitments (2026–2032)
-            st.markdown("##### 📅 Projected Payroll (2026–2032)")
+            st.markdown("##### 📅 Committed Payroll (2026–2032)")
             _fut_years = []
             for yr in range(2026, 2033):
                 col = f"salary_{yr}_M"
@@ -9149,14 +9174,14 @@ def _render_team_analysis_page():
 
 
 # ---------------------------------------------------------------------------
-# Glossary & Methodology page
+# Methodology & Data Sources page
 # ---------------------------------------------------------------------------
 
 def _render_glossary_page():
-    """Full glossary and methodology reference page — pure static content."""
+    """Methodology & data sources reference page — pure static content."""
 
     st.markdown(
-        "<h1 style='margin-bottom:0.1rem;'>📖 Glossary & Methodology</h1>"
+        "<h1 style='margin-bottom:0.1rem;'>📖 Methodology & Data Sources</h1>"
         "<p style='color:#4a687e;font-size:0.82rem;margin-bottom:1.5rem;'>"
         "Every metric, formula, and term used across the MLB Toolbox — explained in one place.</p>",
         unsafe_allow_html=True,
