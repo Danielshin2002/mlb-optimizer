@@ -8845,51 +8845,55 @@ def _render_team_analysis_page():
                     _td = _td.merge(_live_stats[_live_cols], on="_pid", how="left")
                     _td = _td.drop(columns=["_pid"], errors="ignore")
 
+            # ── Safe column getter ────────────────────────────────────────
+            def _col(df, name, default=None):
+                """Get column values safely, returning NaN series if missing."""
+                if name in df.columns:
+                    return df[name].values
+                return pd.array([default] * len(df))
+
             # ── Build position player table ──────────────────────────────
             def _build_hitter_tbl(src_df):
-                tbl = pd.DataFrame()
-                tbl["Player"] = src_df["full_name"].values
-                tbl["Pos"] = src_df.get("position_primary", src_df.get("position", pd.Series())).values
-                tbl["Bats"] = src_df.get("bats", pd.Series(dtype=str)).values
-                tbl["Age"] = src_df["age"].values
-                _stg = src_df.get("stage_display", src_df.get("contract_stage", pd.Series())).copy()
-                _stg = _stg.replace({"FA": "Free Agent"})
-                tbl["Stage"] = _stg.values
-                tbl["'26 Salary"] = src_df["salary_2026_M"].values
-                tbl["AVG"] = src_df.get("AVG", pd.Series(dtype=float)).values
-                tbl["OBP"] = src_df.get("OBP", pd.Series(dtype=float)).values
-                tbl["HR"] = src_df.get("HR", pd.Series(dtype=float)).values
-                # 2026 live stats
-                if "avg_2026" in src_df.columns:
-                    tbl["'26 AVG"] = src_df.get("avg_2026", pd.Series(dtype=str)).values
-                    tbl["'26 HR"] = src_df.get("hr_2026", pd.Series(dtype=float)).values
-                tbl["'25 fWAR"] = src_df.get("WAR_Total", pd.Series(dtype=float)).values
-                tbl["Contract"] = src_df.get("pay_contract", pd.Series(dtype=str)).values
+                src = src_df.reset_index(drop=True)
+                tbl = pd.DataFrame({
+                    "Player": _col(src, "full_name"),
+                    "Pos": _col(src, "position_primary", _col(src, "position")),
+                    "Bats": _col(src, "bats"),
+                    "Age": _col(src, "age"),
+                    "Stage": src["stage_display"].replace({"FA": "Free Agent"}).values if "stage_display" in src.columns else _col(src, "contract_stage"),
+                    "'26 Salary": _col(src, "salary_2026_M"),
+                    "AVG": _col(src, "AVG"),
+                    "OBP": _col(src, "OBP"),
+                    "HR": _col(src, "HR"),
+                })
+                if "avg_2026" in src.columns:
+                    tbl["'26 AVG"] = _col(src, "avg_2026")
+                    tbl["'26 HR"] = _col(src, "hr_2026")
+                tbl["'25 fWAR"] = _col(src, "WAR_Total")
+                tbl["Contract"] = _col(src, "pay_contract")
                 tbl = tbl.sort_values("'26 Salary", ascending=False).reset_index(drop=True)
                 tbl.insert(0, "#", range(1, len(tbl) + 1))
                 return tbl
 
             def _build_pitcher_tbl(src_df):
-                tbl = pd.DataFrame()
-                tbl["Player"] = src_df["full_name"].values
-                tbl["Pos"] = src_df.get("position_primary", src_df.get("position", pd.Series())).values
-                tbl["Throws"] = src_df.get("throws", pd.Series(dtype=str)).values
-                tbl["Age"] = src_df["age"].values
-                _stg = src_df.get("stage_display", src_df.get("contract_stage", pd.Series())).copy()
-                _stg = _stg.replace({"FA": "Free Agent"})
-                tbl["Stage"] = _stg.values
-                tbl["'26 Salary"] = src_df["salary_2026_M"].values
-                tbl["ERA"] = src_df.get("ERA", pd.Series(dtype=float)).values
-                tbl["WHIP"] = src_df.get("WHIP", pd.Series(dtype=float)).values
-                tbl["IP"] = src_df.get("IP", pd.Series(dtype=float)).values
-                # 2026 live stats
-                if "era_2026" in src_df.columns:
-                    tbl["'26 ERA"] = src_df.get("era_2026", pd.Series(dtype=str)).values
-                    tbl["'26 W-L"] = (src_df.get("w_2026", pd.Series(dtype=str)).fillna("").astype(str) + "-"
-                                      + src_df.get("l_2026", pd.Series(dtype=str)).fillna("").astype(str)).values
-                    tbl["'26 IP"] = src_df.get("ip_2026", pd.Series(dtype=str)).values
-                tbl["'25 fWAR"] = src_df.get("WAR_Total", pd.Series(dtype=float)).values
-                tbl["Contract"] = src_df.get("pay_contract", pd.Series(dtype=str)).values
+                src = src_df.reset_index(drop=True)
+                tbl = pd.DataFrame({
+                    "Player": _col(src, "full_name"),
+                    "Pos": _col(src, "position_primary", _col(src, "position")),
+                    "Throws": _col(src, "throws"),
+                    "Age": _col(src, "age"),
+                    "Stage": src["stage_display"].replace({"FA": "Free Agent"}).values if "stage_display" in src.columns else _col(src, "contract_stage"),
+                    "'26 Salary": _col(src, "salary_2026_M"),
+                    "ERA": _col(src, "ERA"),
+                    "WHIP": _col(src, "WHIP"),
+                    "IP": _col(src, "IP"),
+                })
+                if "era_2026" in src.columns:
+                    tbl["'26 ERA"] = _col(src, "era_2026")
+                    tbl["'26 W-L"] = (src["w_2026"].fillna("").astype(str) + "-" + src["l_2026"].fillna("").astype(str)).values if "w_2026" in src.columns else None
+                    tbl["'26 IP"] = _col(src, "ip_2026")
+                tbl["'25 fWAR"] = _col(src, "WAR_Total")
+                tbl["Contract"] = _col(src, "pay_contract")
                 tbl = tbl.sort_values("'26 Salary", ascending=False).reset_index(drop=True)
                 tbl.insert(0, "#", range(1, len(tbl) + 1))
                 return tbl
@@ -8925,7 +8929,8 @@ def _render_team_analysis_page():
                 )
 
                 _fmt_h = {"Age": "{:.0f}", "'26 Salary": "${:.2f}M", "'25 fWAR": "{:.1f}",
-                          "AVG": "{:.3f}", "OBP": "{:.3f}", "HR": "{:.0f}"}
+                          "AVG": "{:.3f}", "OBP": "{:.3f}", "HR": "{:.0f}",
+                          "'26 HR": "{:.0f}"}
                 _fmt_p = {"Age": "{:.0f}", "'26 Salary": "${:.2f}M", "'25 fWAR": "{:.1f}",
                           "ERA": "{:.2f}", "WHIP": "{:.2f}", "IP": "{:.1f}"}
 
