@@ -1697,7 +1697,7 @@ footer { display: none !important; }
 [data-testid="stCaptionContainer"] p,
 [data-testid="stCaption"] {
   color: #7a9ebc !important;
-  font-size: 0.78rem !important;
+  font-size: 0.82rem !important;
 }
 /* ── General paragraph / body text brighter ──────────────────────── */
 .stApp p, .stApp span, .stApp label, .stApp div {
@@ -1705,8 +1705,8 @@ footer { display: none !important; }
 }
 [data-testid="stMarkdownContainer"] p {
   color: #93b8d8 !important;
-  font-size: 0.84rem !important;
-  line-height: 1.6 !important;
+  font-size: 0.88rem !important;
+  line-height: 1.65 !important;
 }
 h1,h2,h3,h4,h5,h6 { color: #d6e8f8 !important; }
 
@@ -8716,7 +8716,7 @@ def _render_team_analysis_page():
         f"<div style='display:flex;flex-wrap:wrap;gap:12px;'>"
         f"<div style='{_kpi}'>"
         f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>2025 Record</div>"
-        f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_wins}W</div></div>"
+        f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_wins}–{162 - _wins}</div></div>"
         f"<div style='{_kpi}'>"
         f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>2026 Record</div>"
         f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_record_26}</div></div>"
@@ -8730,8 +8730,8 @@ def _render_team_analysis_page():
         f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_war_rank}/30</div></div>"
         f"<div style='{_kpi}'>"
         f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>{'Surplus Value' if _gap < 0 else 'Lost Value'}</div>"
-        f"<div style='font-size:1.2rem;font-weight:700;color:{'#22c55e' if _gap < 0 else '#ef4444'};'>"
-        f"{'$' + str(abs(int(_gap))) + 'M' if _gap < 0 else '$' + str(int(_gap)) + 'M'}</div>"
+        f"<div style='font-size:1.2rem;font-weight:700;color:{'#22c55e' if _gap < 0 else '#f59e0b'};'>"
+        f"${int(_gap):+d}M</div>"
         f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_eff_rank}/30</div></div>"
         f"<div style='{_kpi}'>"
         f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>Spend Efficiency</div>"
@@ -8774,16 +8774,16 @@ def _render_team_analysis_page():
                 tbl = pd.DataFrame()
                 tbl["Player"] = src_df["full_name"].values
                 tbl["Pos"] = src_df.get("position_primary", src_df.get("position", pd.Series())).values
+                tbl["B/T"] = (src_df.get("bats", pd.Series(dtype=str)).fillna("—").astype(str) + "/"
+                              + src_df.get("throws", pd.Series(dtype=str)).fillna("—").astype(str)).values
+                tbl["Age"] = src_df["age"].values
                 # Stage: rename FA to Free Agent
                 _stg = src_df.get("stage_display", src_df.get("contract_stage", pd.Series())).copy()
                 _stg = _stg.replace({"FA": "Free Agent"})
                 tbl["Stage"] = _stg.values
-                tbl["Age"] = src_df["age"].values
                 tbl["'26 Salary $M"] = src_df["salary_2026_M"].values
                 tbl["'25 fWAR"] = src_df.get("WAR_Total", pd.Series(dtype=float)).values
                 tbl["Contract"] = src_df.get("pay_contract", pd.Series(dtype=str)).values
-                tbl["Bats"] = src_df.get("bats", pd.Series(dtype=str)).values
-                tbl["Throws"] = src_df.get("throws", pd.Series(dtype=str)).values
                 tbl = tbl.sort_values("'26 Salary $M", ascending=False).reset_index(drop=True)
                 tbl.insert(0, "#", range(1, len(tbl) + 1))
                 return tbl
@@ -9138,23 +9138,30 @@ def _render_team_analysis_page():
             ))
             st.plotly_chart(fig_hist, use_container_width=True, config={"displayModeBar": False})
 
-            # Efficiency gap trend
+            # Surplus / Lost Value trend (inverted: negative gap = surplus shown as negative/green)
+            _gap_vals = _te["dollar_gap_M"].values
             fig_gap = go.Figure(go.Bar(
                 x=_te["Year"].astype(int).astype(str),
-                y=_te["dollar_gap_M"],
-                marker_color=["#22c55e" if g < 0 else "#ef4444" for g in _te["dollar_gap_M"]],
-                text=[f"${g:+.0f}M" for g in _te["dollar_gap_M"]],
+                y=_gap_vals,
+                marker_color=["#22c55e" if g < 0 else "#f59e0b" for g in _gap_vals],
+                text=[f"${g:+.0f}M" for g in _gap_vals],
                 textposition="outside", textfont=dict(color="#d6e8f8", size=10),
                 hovertemplate="%{x}: $%{y:+.0f}M<extra></extra>",
             ))
-            _abs_max_g = max(abs(_te["dollar_gap_M"]).max(), 10) * 1.3
+            _abs_max_g = max(abs(_gap_vals).max(), 10) * 1.3
             fig_gap.update_layout(**_pt(
                 title=f"{_full_name} — Surplus / Lost Value by Season",
                 xaxis=dict(title="Season"),
-                yaxis=dict(title="$ Gap ($M)", zeroline=True, zerolinecolor="#4a687e",
-                           range=[-_abs_max_g, _abs_max_g]),
+                yaxis=dict(title="Surplus (−) / Lost Value (+) $M", zeroline=True,
+                           zerolinecolor="#4a687e", range=[-_abs_max_g, _abs_max_g]),
                 height=340,
             ))
+            st.markdown(
+                "<div style='font-size:0.75rem;color:#7a9ebc;margin-bottom:0.3rem;'>"
+                "Negative (green) = surplus value (winning more than payroll predicts). "
+                "Positive (orange) = lost value (underperforming relative to spend).</div>",
+                unsafe_allow_html=True,
+            )
             st.plotly_chart(fig_gap, use_container_width=True, config={"displayModeBar": False})
 
             # Payroll + fWAR trend
