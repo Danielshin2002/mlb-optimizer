@@ -8704,43 +8704,56 @@ def _render_team_analysis_page():
 
     # KPI box style — consistent background, white border
     _kpi = ("background:#0d1b2a;border:1px solid #ffffff33;border-radius:8px;"
-            "padding:8px 14px;text-align:center;")
+            "padding:10px 16px;text-align:center;min-width:100px;")
+
+    # Compute league avg fWAR and $/fWAR for context
+    _lg_avg_war = float(all_eff_2025["team_WAR"].mean()) if not all_eff_2025.empty else 0
+    _lg_avg_dpw = float((all_eff_2025["payroll_M"] / all_eff_2025["team_WAR"].clip(lower=0.1)).mean()) if not all_eff_2025.empty else 0
+
+    # Estimate luxury tax (payroll + ~15% for benefits/bonuses)
+    _lux_tax_est = round(_payroll_m * 1.15)
 
     st.markdown(
         f"<div style='background:linear-gradient(135deg,{_tc_dark},{_tc_dark}cc);border:1px solid {_tc_primary}44;"
-        f"border-left:4px solid {_tc_primary};border-radius:10px;padding:16px 20px;margin-bottom:14px;'>"
-        f"<div style='display:flex;align-items:center;gap:14px;margin-bottom:10px;'>"
-        f"<img src='{_logo_url}' width='48' height='48' style='object-fit:contain;' onerror=\"this.style.display='none'\">"
-        f"<div style='font-size:1.4rem;font-weight:800;color:#e8f4ff;'>{_full_name}</div>"
+        f"border-left:4px solid {_tc_primary};border-radius:10px;padding:18px 22px;margin-bottom:14px;'>"
+        f"<div style='display:flex;align-items:center;gap:14px;margin-bottom:12px;'>"
+        f"<img src='{_logo_url}' width='52' height='52' style='object-fit:contain;' onerror=\"this.style.display='none'\">"
+        f"<div style='font-size:1.5rem;font-weight:800;color:#e8f4ff;'>{_full_name}</div>"
         f"</div>"
-        f"<div style='display:flex;flex-wrap:wrap;gap:12px;'>"
+        f"<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;'>"
+        # Row 1: Records + Payroll + fWAR
         f"<div style='{_kpi}'>"
-        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>2025 Record</div>"
-        f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_wins}–{162 - _wins}</div></div>"
+        f"<div style='font-size:11px;color:{_tc_accent};text-transform:uppercase;'>2025 Record</div>"
+        f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>{_wins}–{162 - _wins}</div></div>"
         f"<div style='{_kpi}'>"
-        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>2026 Record</div>"
-        f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_record_26}</div></div>"
+        f"<div style='font-size:11px;color:{_tc_accent};text-transform:uppercase;'>2026 Record</div>"
+        f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>{_record_26}</div></div>"
         f"<div style='{_kpi}'>"
-        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>2026 Payroll</div>"
-        f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>${_payroll_m:.0f}M</div>"
-        f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_pay_rank}/30</div></div>"
+        f"<div style='font-size:11px;color:{_tc_accent};text-transform:uppercase;'>2026 Payroll</div>"
+        f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>${_payroll_m:.0f}M</div>"
+        f"<div style='font-size:0.68rem;color:#7a9ebc;'>#{_pay_rank}/30</div></div>"
         f"<div style='{_kpi}'>"
-        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>Team fWAR</div>"
-        f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>{_war:.1f}</div>"
-        f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_war_rank}/30</div></div>"
+        f"<div style='font-size:11px;color:{_tc_accent};text-transform:uppercase;'>Lux Tax Est.</div>"
+        f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>~${_lux_tax_est}M</div>"
+        f"<div style='font-size:0.68rem;color:#7a9ebc;'>CBT: $244M</div></div>"
         f"<div style='{_kpi}'>"
-        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>{'Surplus Value' if _gap < 0 else 'Lost Value'}</div>"
-        f"<div style='font-size:1.2rem;font-weight:700;color:{'#22c55e' if _gap < 0 else '#f59e0b'};'>"
+        f"<div style='font-size:11px;color:{_tc_accent};text-transform:uppercase;'>Team fWAR</div>"
+        f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>{_war:.1f}</div>"
+        f"<div style='font-size:0.68rem;color:#7a9ebc;'>#{_war_rank}/30 · avg {_lg_avg_war:.0f}</div></div>"
+        f"<div style='{_kpi}'>"
+        f"<div style='font-size:11px;color:{_tc_accent};text-transform:uppercase;'>{'Surplus Value' if _gap < 0 else 'Lost Value'}</div>"
+        f"<div style='font-size:1.3rem;font-weight:700;color:{'#22c55e' if _gap < 0 else '#f59e0b'};'>"
         f"${int(_gap):+d}M</div>"
-        f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_eff_rank}/30</div></div>"
+        f"<div style='font-size:0.68rem;color:#7a9ebc;'>#{_eff_rank}/30</div></div>"
         f"<div style='{_kpi}'>"
-        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>Spend Efficiency</div>"
-        f"<div style='font-size:1rem;font-weight:700;color:#e8f4ff;'>"
-        f"#{_eff_rank} <span style='font-size:0.7rem;color:#7a9ebc;'>MLB</span></div>"
-        f"<div style='font-size:0.65rem;color:#7a9ebc;'>#{_lg_rank}/{_lg_total} {_team_lg}</div></div>"
+        f"<div style='font-size:11px;color:{_tc_accent};text-transform:uppercase;'>Spend Efficiency</div>"
+        f"<div style='font-size:1.1rem;font-weight:700;color:#e8f4ff;'>"
+        f"#{_eff_rank} <span style='font-size:0.72rem;color:#7a9ebc;'>MLB</span></div>"
+        f"<div style='font-size:0.68rem;color:#7a9ebc;'>#{_lg_rank}/{_lg_total} {_team_lg}</div></div>"
         f"<div style='{_kpi}'>"
-        f"<div style='font-size:10px;color:{_tc_accent};text-transform:uppercase;'>$/fWAR</div>"
-        f"<div style='font-size:1.2rem;font-weight:700;color:#e8f4ff;'>${_dpw:.1f}M</div></div>"
+        f"<div style='font-size:11px;color:{_tc_accent};text-transform:uppercase;'>$/fWAR</div>"
+        f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>${_dpw:.1f}M</div>"
+        f"<div style='font-size:0.68rem;color:#7a9ebc;'>avg ${_lg_avg_dpw:.1f}M</div></div>"
         f"</div></div>",
         unsafe_allow_html=True,
     )
@@ -8755,36 +8768,61 @@ def _render_team_analysis_page():
         if not team_data.empty:
             # ── Merge 2025 fWAR from combined stats ──────────────────────
             _td = team_data.copy()
+            # Merge 2025 stats (fWAR + batting/pitching stats)
             try:
                 _s_csv = _data_url("data/mlb_combined_2021_2025.csv")
                 _s_all = _read_csv(_s_csv, low_memory=False)
                 _s_all.columns = [c.strip() for c in _s_all.columns]
                 _s_all["Year"] = pd.to_numeric(_s_all["Year"], errors="coerce")
-                _s_all["WAR_Total"] = pd.to_numeric(_s_all.get("WAR_Total", pd.Series()), errors="coerce")
-                _s25 = _s_all[_s_all["Year"] == 2025][["Player", "WAR_Total"]].drop_duplicates("Player", keep="first")
+                for _sc in ["WAR_Total", "HR", "AVG", "OBP", "SLG", "ERA", "WHIP", "IP", "K9"]:
+                    if _sc in _s_all.columns:
+                        _s_all[_sc] = pd.to_numeric(_s_all[_sc], errors="coerce")
+                _s25_cols = ["Player", "WAR_Total", "HR", "AVG", "OBP", "SLG", "ERA", "WHIP", "IP", "K9"]
+                _s25_cols = [c for c in _s25_cols if c in _s_all.columns]
+                _s25 = _s_all[_s_all["Year"] == 2025][_s25_cols].drop_duplicates("Player", keep="first")
                 _s25["_jk"] = _s25["Player"].str.lower().str.strip()
                 _td["_jk"] = _td["full_name"].apply(_fix_player_name).str.lower().str.strip()
-                _td = _td.merge(_s25[["_jk", "WAR_Total"]], on="_jk", how="left")
+                _td = _td.merge(_s25.drop(columns=["Player"]), on="_jk", how="left")
                 _td = _td.drop(columns=["_jk"])
             except Exception:
                 _td["WAR_Total"] = None
 
-            # ── Build base table ─────────────────────────────────────────
-            def _build_roster_tbl(src_df):
+            # ── Build position player table ──────────────────────────────
+            def _build_hitter_tbl(src_df):
                 tbl = pd.DataFrame()
                 tbl["Player"] = src_df["full_name"].values
                 tbl["Pos"] = src_df.get("position_primary", src_df.get("position", pd.Series())).values
-                tbl["B/T"] = (src_df.get("bats", pd.Series(dtype=str)).fillna("—").astype(str) + "/"
-                              + src_df.get("throws", pd.Series(dtype=str)).fillna("—").astype(str)).values
+                tbl["Bats"] = src_df.get("bats", pd.Series(dtype=str)).values
                 tbl["Age"] = src_df["age"].values
-                # Stage: rename FA to Free Agent
                 _stg = src_df.get("stage_display", src_df.get("contract_stage", pd.Series())).copy()
                 _stg = _stg.replace({"FA": "Free Agent"})
                 tbl["Stage"] = _stg.values
-                tbl["'26 Salary $M"] = src_df["salary_2026_M"].values
+                tbl["'26 Salary"] = src_df["salary_2026_M"].values
                 tbl["'25 fWAR"] = src_df.get("WAR_Total", pd.Series(dtype=float)).values
+                tbl["AVG"] = src_df.get("AVG", pd.Series(dtype=float)).values
+                tbl["OBP"] = src_df.get("OBP", pd.Series(dtype=float)).values
+                tbl["HR"] = src_df.get("HR", pd.Series(dtype=float)).values
                 tbl["Contract"] = src_df.get("pay_contract", pd.Series(dtype=str)).values
-                tbl = tbl.sort_values("'26 Salary $M", ascending=False).reset_index(drop=True)
+                tbl = tbl.sort_values("'26 Salary", ascending=False).reset_index(drop=True)
+                tbl.insert(0, "#", range(1, len(tbl) + 1))
+                return tbl
+
+            def _build_pitcher_tbl(src_df):
+                tbl = pd.DataFrame()
+                tbl["Player"] = src_df["full_name"].values
+                tbl["Pos"] = src_df.get("position_primary", src_df.get("position", pd.Series())).values
+                tbl["Throws"] = src_df.get("throws", pd.Series(dtype=str)).values
+                tbl["Age"] = src_df["age"].values
+                _stg = src_df.get("stage_display", src_df.get("contract_stage", pd.Series())).copy()
+                _stg = _stg.replace({"FA": "Free Agent"})
+                tbl["Stage"] = _stg.values
+                tbl["'26 Salary"] = src_df["salary_2026_M"].values
+                tbl["'25 fWAR"] = src_df.get("WAR_Total", pd.Series(dtype=float)).values
+                tbl["ERA"] = src_df.get("ERA", pd.Series(dtype=float)).values
+                tbl["WHIP"] = src_df.get("WHIP", pd.Series(dtype=float)).values
+                tbl["IP"] = src_df.get("IP", pd.Series(dtype=float)).values
+                tbl["Contract"] = src_df.get("pay_contract", pd.Series(dtype=str)).values
+                tbl = tbl.sort_values("'26 Salary", ascending=False).reset_index(drop=True)
                 tbl.insert(0, "#", range(1, len(tbl) + 1))
                 return tbl
 
@@ -8804,29 +8842,66 @@ def _render_team_analysis_page():
             _il_df = _td[_td["_status_cat"] == "IL"]
             _restricted_df = _td[_td["_status_cat"] == "Restricted"]
 
-            # ── Active Roster (26-Man) ───────────────────────────────────
-            st.markdown(f"##### Active Roster ({len(_active_df)} players)")
-            st.markdown(
-                "<div style='font-size:0.78rem;color:#7a9ebc;margin-bottom:0.4rem;'>"
-                "Sorted by 2026 salary. Color: "
-                "<span style='color:#4ade80;'>Pre-Arb</span> · "
-                "<span style='color:#14b8a6;'>Arb</span> · "
-                "<span style='color:#60a5fa;'>Free Agent</span></div>",
-                unsafe_allow_html=True,
-            )
+            # ── Active Roster — split into Position Players and Pitchers ──
+            _PITCHER_POS = {"SP", "RP", "P", "CL"}
             if not _active_df.empty:
-                _act_tbl = _build_roster_tbl(_active_df)
-                st.dataframe(
-                    _act_tbl.style.apply(_stage_clr, axis=1).format(
-                        {k: v for k, v in _fmt.items() if k in _act_tbl.columns}, na_rep="—"),
-                    hide_index=True, use_container_width=True,
-                    height=min(60 + len(_act_tbl) * 35, 600),
+                _act_pos = _active_df[~_active_df.get("position_primary", _active_df.get("position", pd.Series())).isin(_PITCHER_POS)]
+                _act_pit = _active_df[_active_df.get("position_primary", _active_df.get("position", pd.Series())).isin(_PITCHER_POS)]
+
+                st.markdown(
+                    "<div style='font-size:0.82rem;color:#7a9ebc;margin-bottom:0.3rem;'>"
+                    "Color: <span style='color:#4ade80;'>Pre-Arb</span> · "
+                    "<span style='color:#14b8a6;'>Arb</span> · "
+                    "<span style='color:#60a5fa;'>Free Agent</span></div>",
+                    unsafe_allow_html=True,
                 )
+
+                _fmt_h = {"Age": "{:.0f}", "'26 Salary": "${:.2f}M", "'25 fWAR": "{:.1f}",
+                          "AVG": "{:.3f}", "OBP": "{:.3f}", "HR": "{:.0f}"}
+                _fmt_p = {"Age": "{:.0f}", "'26 Salary": "${:.2f}M", "'25 fWAR": "{:.1f}",
+                          "ERA": "{:.2f}", "WHIP": "{:.2f}", "IP": "{:.1f}"}
+
+                # Position Players
+                st.markdown(f"##### Position Players ({len(_act_pos)})")
+                if not _act_pos.empty:
+                    _h_tbl = _build_hitter_tbl(_act_pos)
+                    st.dataframe(
+                        _h_tbl.style.apply(_stage_clr, axis=1).format(
+                            {k: v for k, v in _fmt_h.items() if k in _h_tbl.columns}, na_rep="—"),
+                        hide_index=True, use_container_width=True,
+                        height=min(60 + len(_h_tbl) * 35, 500),
+                    )
+
+                # Pitchers
+                st.markdown(f"##### Pitchers ({len(_act_pit)})")
+                if not _act_pit.empty:
+                    _p_tbl = _build_pitcher_tbl(_act_pit)
+                    st.dataframe(
+                        _p_tbl.style.apply(_stage_clr, axis=1).format(
+                            {k: v for k, v in _fmt_p.items() if k in _p_tbl.columns}, na_rep="—"),
+                        hide_index=True, use_container_width=True,
+                        height=min(60 + len(_p_tbl) * 35, 500),
+                    )
+
+            # ── Simple table builder for IL/Restricted ────────────────────
+            def _build_simple_tbl(src_df):
+                tbl = pd.DataFrame()
+                tbl["Player"] = src_df["full_name"].values
+                tbl["Pos"] = src_df.get("position_primary", src_df.get("position", pd.Series())).values
+                tbl["Age"] = src_df["age"].values
+                _stg = src_df.get("stage_display", src_df.get("contract_stage", pd.Series())).copy()
+                _stg = _stg.replace({"FA": "Free Agent"})
+                tbl["Stage"] = _stg.values
+                tbl["'26 Salary"] = src_df["salary_2026_M"].values
+                tbl["'25 fWAR"] = src_df.get("WAR_Total", pd.Series(dtype=float)).values
+                tbl = tbl.sort_values("'26 Salary", ascending=False).reset_index(drop=True)
+                tbl.insert(0, "#", range(1, len(tbl) + 1))
+                return tbl
+            _fmt_s = {"Age": "{:.0f}", "'26 Salary": "${:.2f}M", "'25 fWAR": "{:.1f}"}
 
             # ── Injured List ─────────────────────────────────────────────
             if not _il_df.empty:
-                # Add IL type column
-                _il_tbl = _build_roster_tbl(_il_df)
+                _il_tbl = _build_simple_tbl(_il_df)
                 _il_tbl.insert(2, "IL Type", _il_df["status"].apply(
                     lambda s: "60-Day" if "60" in str(s) else "15-Day" if "15" in str(s) else "10-Day"
                 ).values)
@@ -8834,14 +8909,14 @@ def _render_team_analysis_page():
                 st.dataframe(
                     _il_tbl.style.apply(
                         lambda row: ["background-color:#2d0c0c66;color:#fca5a5"] * len(row), axis=1
-                    ).format({k: v for k, v in _fmt.items() if k in _il_tbl.columns}, na_rep="—"),
+                    ).format({k: v for k, v in _fmt_s.items() if k in _il_tbl.columns}, na_rep="—"),
                     hide_index=True, use_container_width=True,
                     height=min(60 + len(_il_tbl) * 35, 400),
                 )
 
             # ── Restricted (Minor League 40-Man) ─────────────────────────
             if not _restricted_df.empty:
-                _res_tbl = _build_roster_tbl(_restricted_df)
+                _res_tbl = _build_simple_tbl(_restricted_df)
                 st.markdown(f"##### Minor League / Restricted ({len(_restricted_df)} players)")
                 st.markdown(
                     "<div style='font-size:0.75rem;color:#4a687e;margin-bottom:0.3rem;'>"
@@ -8852,7 +8927,7 @@ def _render_team_analysis_page():
                 st.dataframe(
                     _res_tbl.style.apply(
                         lambda row: ["background-color:#1a1a2e44"] * len(row), axis=1
-                    ).format({k: v for k, v in _fmt.items() if k in _res_tbl.columns}, na_rep="—"),
+                    ).format({k: v for k, v in _fmt_s.items() if k in _res_tbl.columns}, na_rep="—"),
                     hide_index=True, use_container_width=True,
                     height=min(60 + len(_res_tbl) * 35, 500),
                 )
