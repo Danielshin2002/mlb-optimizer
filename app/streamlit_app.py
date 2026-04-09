@@ -3834,7 +3834,7 @@ def _render_simulator_page():
                 _after_color = "#4ade80" if _budget_after >= 10 else ("#fbbf24" if _budget_after >= 0 else "#fca5a5")
                 st.markdown(
                     f"<div style='padding:0.3rem 0.5rem;background:#0d1e35;border:1px solid #1e3a5f;"
-                    f"border-radius:8px;font-size:0.68rem;color:#7a9ebc;line-height:1.5;'>"
+                    f"border-radius:8px;font-size:0.75rem;color:#93b8d8;line-height:1.5;'>"
                     f"<strong style='color:#d6e8f8;'>{n_new}</strong> new · "
                     f"WAR <strong style='color:#d6e8f8;'>+{_sel_war:.1f}</strong> · "
                     f"Cost <strong style='color:#d6e8f8;'>${_sel_cost:.1f}M</strong> · "
@@ -4008,7 +4008,7 @@ def _render_simulator_page():
                     f"<div class='sim-cbt-block'>"
                     f"  <div class='cb-title'>🧾 CBT Threshold Planner</div>"
                     f"  <div class='sim-cbt-row'>"
-                    f"    <span style='font-size:0.68rem;color:#7a9ebc;'>"
+                    f"    <span style='font-size:0.75rem;color:#93b8d8;'>"
                     f"      Target: <strong style='color:#d6e8f8;'>${_eff_thresh:.0f}M</strong>"
                     f"    </span>"
                     f"    <span class='sim-cbt-pill {_pill_cls2}'>{_rem_vs_txt}</span>"
@@ -7720,12 +7720,13 @@ def _render_rankings_page():
   border:1px solid #1e3250;border-radius:12px;padding:0.9rem 1.3rem;margin-bottom:0.8rem;}
 .rk-hdr h2{margin:0;font-size:1.25rem;color:#d6e8f8;font-weight:700;}
 .rk-hdr .rk-sub{font-size:0.72rem;color:#7a9ebc;margin-top:0.15rem;}
-.rk-answer{background:#18243a;border:1px solid #1e3250;border-radius:10px;
-  padding:0.7rem 0.8rem;text-align:center;}
-.rk-answer .rk-q{font-size:0.68rem;color:#93b8d8;
+.rk-answer{background:#1c2a42;border:1px solid #1e3250;border-radius:10px;
+  padding:0.8rem 1rem;text-align:center;min-height:120px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.rk-answer .rk-q{font-size:0.72rem;color:#93b8d8;
   letter-spacing:0.05em;margin-bottom:0.2rem;font-weight:600;}
 .rk-answer .rk-team{font-size:1.25rem;font-weight:800;color:#d6e8f8;line-height:1.1;}
-.rk-answer .rk-val{font-size:0.78rem;color:#93b8d8;margin-top:0.2rem;}
+.rk-answer .rk-val{font-size:0.82rem;color:#93b8d8;margin-top:0.2rem;}
 .rk-answer .rk-icon{font-size:1.3rem;margin-bottom:0.15rem;line-height:1;}
 </style>""", unsafe_allow_html=True)
 
@@ -7938,7 +7939,7 @@ def _render_rankings_page():
                 f"<div class='rk-q'>{title}</div>"
                 f"{img_html}"
                 f"<div class='rk-team'>{player_name}</div>"
-                f"<div style='font-size:0.68rem;color:#7a9ebc;margin-top:1px;'>{team}</div>"
+                f"<div style='font-size:0.75rem;color:#93b8d8;margin-top:1px;'>{team}</div>"
                 f"<div class='rk-val'>{value_line}</div>"
                 + (f"<div style='font-size:0.62rem;color:#4a687e;'>{sub_line}</div>" if sub_line else "")
                 + "</div>"
@@ -8843,26 +8844,12 @@ def _render_team_analysis_page():
 
     # CSS to make team picker buttons transparent with logo overlay
     st.markdown("""<style>
-    .team-picker-zone [data-testid="stButton"] > button {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        outline: none !important;
-        padding: 0 !important;
-        min-height: 65px !important;
-        color: transparent !important;
-    }
-    .team-picker-zone [data-testid="stButton"] > button * {
-        color: transparent !important;
-        font-size: 0 !important;
-    }
-    .team-picker-zone [data-testid="stButton"] > button:hover {
-        background: transparent !important;
-        border: none !important;
-    }
-    .team-picker-zone [data-testid="stButton"] > button:focus {
-        border: none !important;
-        box-shadow: none !important;
+    /* Team picker: hide the spacer buttons below logos */
+    .team-picker-zone [data-testid="stButton"] {
+        margin-top: -0.5rem !important;
+        height: 0.1px !important;
+        overflow: hidden !important;
+        opacity: 0.01 !important;
     }
     </style>""", unsafe_allow_html=True)
 
@@ -8897,15 +8884,12 @@ def _render_team_analysis_page():
             for ti, tm in enumerate(teams):
                 is_active = tm == sel_team
                 with tcols[ti]:
-                    if st.button(tm, key=f"tpick_{tm}", use_container_width=True):
+                    # Logo card first
+                    st.markdown(_logo_card(tm, is_active), unsafe_allow_html=True)
+                    # Clickable button overlaid on top (visually hidden)
+                    if st.button(" ", key=f"tpick_{tm}", use_container_width=True):
                         st.session_state["team_analysis_sel"] = tm
                         st.rerun()
-                    # Logo overlay — covers the invisible button
-                    st.markdown(
-                        f"<div style='margin-top:-4.5rem;pointer-events:none;'>"
-                        f"{_logo_card(tm, is_active)}</div>",
-                        unsafe_allow_html=True,
-                    )
 
     with st.container():
         st.markdown("<div class='team-picker-zone'>", unsafe_allow_html=True)
@@ -9007,7 +8991,7 @@ def _render_team_analysis_page():
 
     # KPI box style — consistent background, white border
     _kpi = ("background:#0d1b2a;border:1px solid #ffffff33;border-radius:8px;"
-            "padding:10px 16px;text-align:center;min-width:100px;")
+            "padding:12px 16px;text-align:center;min-width:100px;")
 
     # Compute league avg fWAR and $/fWAR for context
     _lg_avg_war = float(all_eff_2025["team_WAR"].mean()) if not all_eff_2025.empty else 0
@@ -9050,43 +9034,46 @@ def _render_team_analysis_page():
         # Row 1: Records + Payroll + fWAR
         f"<div style='{_kpi}'>"
         f"<div style='font-size:11px;color:{_tc_accent};letter-spacing:0.05em;'>2025 RECORD</div>"
-        f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>{_wins}–{162 - _wins}</div></div>"
+        f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>{_wins}–{162 - _wins}</div>"
+        f"<div style='font-size:0.75rem;color:#93b8d8;'>"
+        + (_team_div if _team_div else "") +
+        f"</div></div>"
         f"<div style='{_kpi}'>"
         f"<div style='font-size:11px;color:{_tc_accent};letter-spacing:0.05em;'>2026 RECORD</div>"
         f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>{_record_26}</div>"
-        f"<div style='font-size:0.68rem;color:#7a9ebc;'>"
+        f"<div style='font-size:0.75rem;color:#93b8d8;'>"
         + (f"{_ordinal(int(_div_rank))} {_team_div}" if _div_rank != "?" else "")
         + f"</div></div>"
         f"<div style='{_kpi}'>"
         f"<div style='font-size:11px;color:{_tc_accent};letter-spacing:0.05em;'>2026 PAYROLL</div>"
         f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>${_payroll_m:.0f}M</div>"
-        f"<div style='font-size:0.68rem;color:#7a9ebc;'>#{_pay_rank}/30</div></div>"
+        f"<div style='font-size:0.75rem;color:#93b8d8;'>#{_pay_rank}/30</div></div>"
         f"<div style='{_kpi}'>"
         f"<div style='font-size:11px;color:{_tc_accent};letter-spacing:0.05em;'>LUX TAX EST.</div>"
         f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>~${_lux_tax_est}M</div>"
-        f"<div style='font-size:0.68rem;color:#7a9ebc;'>CBT: $244M</div></div>"
+        f"<div style='font-size:0.75rem;color:#93b8d8;'>CBT: $244M</div></div>"
         f"<div style='{_kpi}'>"
         f"<div style='font-size:11px;color:{_tc_accent};letter-spacing:0.05em;'>TEAM fWAR</div>"
         f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>{_war:.1f}</div>"
-        f"<div style='font-size:0.68rem;color:#7a9ebc;'>#{_war_rank}/30 · avg {_lg_avg_war:.0f}</div></div>"
+        f"<div style='font-size:0.75rem;color:#93b8d8;'>#{_war_rank}/30 · avg {_lg_avg_war:.0f}</div></div>"
         f"<div style='{_kpi}'>"
         f"<div style='font-size:11px;color:{_tc_accent};letter-spacing:0.05em;'>{'SURPLUS VALUE' if _gap < 0 else 'LOST VALUE'}</div>"
         f"<div style='font-size:1.3rem;font-weight:700;color:{'#22c55e' if _gap < 0 else '#f59e0b'};'>"
         f"${int(_gap):+d}M</div>"
-        f"<div style='font-size:0.68rem;color:#7a9ebc;'>#{_eff_rank}/30</div></div>"
+        f"<div style='font-size:0.75rem;color:#93b8d8;'>#{_eff_rank}/30</div></div>"
         f"<div style='{_kpi}'>"
         f"<div style='font-size:11px;color:{_tc_accent};letter-spacing:0.05em;'>SPEND EFFICIENCY</div>"
         f"<div style='font-size:1.1rem;font-weight:700;color:#e8f4ff;'>"
         f"#{_eff_rank} <span style='font-size:0.72rem;color:#7a9ebc;'>MLB</span></div>"
-        f"<div style='font-size:0.68rem;color:#7a9ebc;'>#{_lg_rank}/{_lg_total} {_team_lg}</div></div>"
+        f"<div style='font-size:0.75rem;color:#93b8d8;'>#{_lg_rank}/{_lg_total} {_team_lg}</div></div>"
         f"<div style='{_kpi}'>"
         f"<div style='font-size:11px;color:{_tc_accent};letter-spacing:0.05em;'>$/fWAR</div>"
         f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>${_dpw:.1f}M</div>"
-        f"<div style='font-size:0.68rem;color:#7a9ebc;'>avg ${_lg_avg_dpw:.1f}M</div></div>"
+        f"<div style='font-size:0.75rem;color:#93b8d8;'>avg ${_lg_avg_dpw:.1f}M</div></div>"
         f"<div style='{_kpi}'>"
         f"<div style='font-size:11px;color:{_tc_accent};letter-spacing:0.05em;'>fWAR CONCENTRATION</div>"
         f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>{_conc_pct:.0f}%</div>"
-        f"<div style='font-size:0.68rem;color:#7a9ebc;'>#{_conc_rank}/30 · avg {_conc_avg:.0f}%</div></div>"
+        f"<div style='font-size:0.75rem;color:#93b8d8;'>#{_conc_rank}/30 · avg {_conc_avg:.0f}%</div></div>"
         f"</div></div>",
         unsafe_allow_html=True,
     )
@@ -10027,7 +10014,7 @@ def _render_glossary_page():
             "padding:0.6rem 0.8rem;'>"
             "<div style='font-size:0.8rem;font-weight:700;color:#22c55e;margin-bottom:0.3rem;'>"
             "A+ Roster Example</div>"
-            "<div style='font-size:0.68rem;color:#7a9ebc;line-height:1.7;'>"
+            "<div style='font-size:0.75rem;color:#93b8d8;line-height:1.7;'>"
             "<b style='color:#d6e8f8;'>Production:</b> ~33+ WAR (≥95% of 35 ceiling)<br>"
             "<b style='color:#d6e8f8;'>Efficiency:</b> WAR/$M well above 0.30 baseline<br>"
             "<b style='color:#d6e8f8;'>Depth:</b> All 9 position groups filled<br>"
@@ -10041,7 +10028,7 @@ def _render_glossary_page():
             "padding:0.6rem 0.8rem;'>"
             "<div style='font-size:0.8rem;font-weight:700;color:#facc15;margin-bottom:0.3rem;'>"
             "C Roster Example</div>"
-            "<div style='font-size:0.68rem;color:#7a9ebc;line-height:1.7;'>"
+            "<div style='font-size:0.75rem;color:#93b8d8;line-height:1.7;'>"
             "<b style='color:#d6e8f8;'>Production:</b> ~19-20 WAR (55-60% of ceiling)<br>"
             "<b style='color:#d6e8f8;'>Efficiency:</b> WAR/$M near or below 0.30<br>"
             "<b style='color:#d6e8f8;'>Depth:</b> 5-6 of 9 groups filled, gaps at key spots<br>"
