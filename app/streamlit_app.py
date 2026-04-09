@@ -8837,23 +8837,38 @@ def _render_team_analysis_page():
     _qp_sel = st.query_params.get("sel_team")
     if _qp_sel and _qp_sel in [t for d in _AL_DIVS + _NL_DIVS for t in d[1]]:
         st.session_state["team_analysis_sel"] = _qp_sel
-    sel_team = st.session_state.get("team_analysis_sel")
+    if "team_analysis_sel" not in st.session_state:
+        st.session_state["team_analysis_sel"] = "NYY"
+    sel_team = st.session_state.get("team_analysis_sel", "NYY")
 
-    # CSS to hide the Streamlit button behind the logo overlay
+    # CSS to make team picker buttons transparent with logo overlay
     st.markdown("""<style>
-    div[data-testid="stButton"] > button[key^="tpick_"] {
-        opacity: 0 !important; height: 70px !important;
+    .team-picker-zone [data-testid="stButton"] > button {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 2px !important;
+        min-height: 65px !important;
+    }
+    .team-picker-zone [data-testid="stButton"] > button:hover {
+        background: rgba(59,130,246,0.08) !important;
+        border-radius: 8px !important;
+    }
+    .team-picker-zone [data-testid="stButton"] > button > div > p {
+        font-size: 0 !important;
+        line-height: 0 !important;
+        height: 0 !important;
     }
     </style>""", unsafe_allow_html=True)
 
     def _logo_card(tm, is_active):
         _url = _team_logo_url(tm)
-        _bdr = "2px solid #3b82f6" if is_active else "1px solid transparent"
-        _bg = "#18243a" if is_active else "transparent"
+        _bdr = "2px solid #3b82f6" if is_active else "none"
+        _bg = "rgba(59,130,246,0.1)" if is_active else "transparent"
         _shadow = "box-shadow:0 0 12px #3b82f644;" if is_active else ""
         return (
             f'<div style="background:{_bg};border:{_bdr};border-radius:8px;'
-            f'padding:6px;text-align:center;{_shadow}" '
+            f'padding:4px;text-align:center;{_shadow}" '
             f'title="{_TEAM_CITIES.get(tm, "")} {_ABBR_TO_FULL.get(tm, tm)}">'
             f'<img src="{_url}" width="55" height="55" style="object-fit:contain;" '
             f'onerror="this.outerHTML=\'<div style=&quot;font-size:1rem;font-weight:700;'
@@ -8887,11 +8902,14 @@ def _render_team_analysis_page():
                         unsafe_allow_html=True,
                     )
 
-    al_col, nl_col = st.columns(2, gap="medium")
-    with al_col:
-        _render_league_grid("American League", _AL_DIVS)
-    with nl_col:
-        _render_league_grid("National League", _NL_DIVS)
+    with st.container():
+        st.markdown("<div class='team-picker-zone'>", unsafe_allow_html=True)
+        al_col, nl_col = st.columns(2, gap="medium")
+        with al_col:
+            _render_league_grid("American League", _AL_DIVS)
+        with nl_col:
+            _render_league_grid("National League", _NL_DIVS)
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # Spacer between team picker and content
     st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
