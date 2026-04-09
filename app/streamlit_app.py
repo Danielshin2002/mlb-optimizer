@@ -496,8 +496,8 @@ def _pt(**overrides) -> dict:
     Nested dict overrides are shallow-merged with the base dicts.
     """
     base: dict = dict(
-        paper_bgcolor="#111927",   # match main bg
-        plot_bgcolor="#18243a",    # slightly lifted card surface
+        paper_bgcolor="#141d2e",   # match main bg
+        plot_bgcolor="#1c2a42",    # slightly lifted card surface
         font=dict(color="#7a9ebc", size=11),
         title=dict(font=dict(color="#d6e8f8", size=13), x=0.02),
         xaxis=dict(
@@ -511,7 +511,7 @@ def _pt(**overrides) -> dict:
             tickfont=dict(color="#7a9ebc"), title_font=dict(color="#a8c8e8"),
         ),
         legend=dict(
-            bgcolor="#18243a", bordercolor="#253d58", borderwidth=1,
+            bgcolor="#1c2a42", bordercolor="#253d58", borderwidth=1,
             font=dict(color="#7a9ebc"),
         ),
         margin=dict(l=50, r=20, t=45, b=50),
@@ -1402,15 +1402,15 @@ def _render_nav_bar():
 [data-testid="stAppViewContainer"],
 [data-testid="stHeader"],
 [data-testid="stBottom"] {
-  background: #111927 !important;
+  background: #141d2e !important;
 }
 [data-testid="stMain"],
 [data-testid="stMainBlockContainer"] {
-  background: #111927 !important;
+  background: #141d2e !important;
 }
 [data-testid="stSidebar"],
 [data-testid="stSidebarContent"] {
-  background: #0e1720 !important;
+  background: #111a24 !important;
   border-right: 1px solid #1e3250 !important;
 }
 /* === ISSUE 1 — Hide Streamlit default toolbar/header/footer === */
@@ -1482,7 +1482,7 @@ footer { display: none !important; }
 
 /* ── Cards / containers ───────────────────────────────────────────── */
 [data-testid="stExpander"] {
-  background: #18243a !important;
+  background: #1c2a42 !important;
   border: 1px solid #1e3250 !important;
   border-radius: 8px !important;
 }
@@ -1598,7 +1598,7 @@ footer { display: none !important; }
   border-color: #3b6fd4 !important;
 }
 [data-baseweb="popover"] [role="listbox"] {
-  background: #18243a !important;
+  background: #1c2a42 !important;
   border: 1px solid #253d58 !important;
 }
 [data-baseweb="option"]:hover {
@@ -1951,14 +1951,41 @@ button[data-testid="stMultiSelectClearButton"] { display: none !important; }
         + _a('league', '📊 Player Analysis')
         + _a('simulator', '🎮 Roster Simulator')
         + _a('glossary', '📖 Methodology')
-        + '<a href="https://docs.google.com/forms/d/e/1FAIpQLSdexY0xhRoQt3F6LVJHdZ7z4_nHeZZIL7Bn8bFrIaqmsTb0Pw/viewform?usp=publish-editor" '
-        + 'target="_blank" style="color:#3b82f6;text-decoration:none;font-size:0.82rem;'
-        + 'padding:0.35rem 0.7rem;margin-left:0.5rem;border:1px solid #2e4a62;border-radius:6px;'
-        + 'white-space:nowrap;">Feedback</a>'
+        + _a('feedback', '💬 Feedback')
         + '</div>'
         + '<hr style="margin:0.4rem 0 1rem;border:none;border-top:1px solid #1e3250;">'
     )
     st.markdown(nav, unsafe_allow_html=True)
+
+    # ── Dark / Light mode toggle ─────────────────────────────────────────
+    _tc1, _tc2 = st.columns([10, 1])
+    with _tc2:
+        _light = st.toggle("☀️", key="light_mode", value=False)
+    if _light:
+        st.markdown("""<style>
+        .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"],
+        [data-testid="stBottom"], [data-testid="stMain"], [data-testid="stMainBlockContainer"] {
+            background: #f0f2f6 !important; }
+        [data-testid="stSidebar"], [data-testid="stSidebarContent"] {
+            background: #e8ebf0 !important; }
+        h1,h2,h3,h4,h5,h6 { color: #1a1a2e !important; }
+        [data-testid="stMarkdownContainer"] p { color: #2d3748 !important; }
+        [data-testid="stCaptionContainer"] p, [data-testid="stCaption"] { color: #4a5568 !important; }
+        [data-testid="stExpander"] { background: #ffffff !important; border-color: #e2e8f0 !important; }
+        [data-testid="stExpander"] summary { color: #2d3748 !important; }
+        [data-testid="stMetric"] { background: #ffffff; border-color: #e2e8f0; }
+        [data-testid="stMetricLabel"] { color: #4a5568 !important; }
+        [data-testid="stMetricValue"] { color: #1a1a2e !important; }
+        .stTabs [data-baseweb="tab"] { color: #4a5568 !important; }
+        .stTabs [aria-selected="true"] { color: #2b5cc8 !important; border-bottom-color: #2b5cc8 !important; }
+        [data-testid="stDataFrame"] .dvn-scroller thead th { background: #edf2f7 !important; color: #2d3748 !important; }
+        [data-testid="stDataFrame"], [data-testid="stDataEditor"] { border-color: #e2e8f0 !important; }
+        .rk-answer { background: #ffffff !important; border-color: #e2e8f0 !important; }
+        .rk-answer .rk-team { color: #1a1a2e !important; }
+        .rk-answer .rk-q { color: #4a5568 !important; }
+        .rk-answer .rk-val { color: #4a5568 !important; }
+        .mlb-nav a { color: #2d3748 !important; }
+        </style>""", unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -8597,6 +8624,13 @@ _LOGO_FILE_NAMES: dict[str, str] = {
 }
 
 
+def _ordinal(n: int) -> str:
+    """Return ordinal string: 1st, 2nd, 3rd, 4th, etc."""
+    if 11 <= n % 100 <= 13:
+        return f"{n}th"
+    return f"{n}{['th','st','nd','rd'][min(n % 10, 4) if n % 10 < 4 else 0]}"
+
+
 def _team_logo_url(abbr: str) -> str:
     """Return the R2 logo URL for a team abbreviation."""
     return _data_url(f"logos/{_LOGO_FILE_NAMES.get(abbr, abbr)}.png")
@@ -8662,6 +8696,67 @@ def _fetch_2026_standings() -> dict[str, tuple[int, int]]:
                 if abbr:
                     records[abbr] = (int(tr.get("wins", 0)), int(tr.get("losses", 0)))
         return records
+    except Exception:
+        return {}
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _fetch_2026_standings_full() -> dict[str, dict]:
+    """Fetch full 2026 standings with division rank, GB, league rank. Cached 24h."""
+    if not _requests_available:
+        return {}
+    _DIV_NAMES = {
+        103: {"E": "AL East", "C": "AL Central", "W": "AL West"},
+        104: {"E": "NL East", "C": "NL Central", "W": "NL West"},
+    }
+    try:
+        resp = _requests.get(
+            "https://statsapi.mlb.com/api/v1/standings"
+            "?leagueId=103,104&season=2026&standingsTypes=regularSeason",
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return {}
+        data = resp.json()
+        # Build overall league rank
+        all_teams = []
+        for division in data.get("records", []):
+            lg_id = division.get("league", {}).get("id", 0)
+            for tr in division.get("teamRecords", []):
+                tid = tr.get("team", {}).get("id")
+                abbr = _MLB_TEAM_ID_MAP.get(tid)
+                if abbr:
+                    w = int(tr.get("wins", 0))
+                    l = int(tr.get("losses", 0))
+                    all_teams.append((abbr, w, l, lg_id))
+        # Sort by wins desc for league ranking
+        all_sorted = sorted(all_teams, key=lambda x: (-x[1], x[2]))
+        _lg_rank = {t[0]: i + 1 for i, t in enumerate(all_sorted)}
+
+        result: dict[str, dict] = {}
+        for division in data.get("records", []):
+            lg_id = division.get("league", {}).get("id", 0)
+            for tr in division.get("teamRecords", []):
+                tid = tr.get("team", {}).get("id")
+                abbr = _MLB_TEAM_ID_MAP.get(tid)
+                if not abbr:
+                    continue
+                div_rank = tr.get("divisionRank", "?")
+                gb = tr.get("divisionGamesBack", "-")
+                w = int(tr.get("wins", 0))
+                l = int(tr.get("losses", 0))
+                # Determine division name from league + rank position
+                div_name = "?"
+                for dk, dv in _DIV_NAMES.get(lg_id, {}).items():
+                    # We don't have direct division ID mapping, use the division object
+                    pass
+                result[abbr] = {
+                    "wins": w, "losses": l,
+                    "div_rank": div_rank, "gb": gb,
+                    "league_rank": _lg_rank.get(abbr, 0),
+                    "league_id": lg_id,
+                }
+        return result
     except Exception:
         return {}
 
@@ -8871,10 +8966,21 @@ def _render_team_analysis_page():
     # Team logo URL from R2
     _logo_url = _team_logo_url(sel_team)
 
-    # Live 2026 record from MLB API (cached 24h)
+    # Live 2026 standings from MLB API (cached 24h)
     _standings = _fetch_2026_standings()
+    _standings_full = _fetch_2026_standings_full()
     _w26, _l26 = _standings.get(sel_team, (0, 0))
     _record_26 = f"{_w26}–{_l26}" if (_w26 + _l26) > 0 else "—"
+
+    # Division standing
+    _stf = _standings_full.get(sel_team, {})
+    _div_rank = _stf.get("div_rank", "?")
+    _div_gb = _stf.get("gb", "-")
+    _mlb_rank = _stf.get("league_rank", 0)
+    # Division name from efficiency data
+    _team_div = ""
+    if not all_eff_2025.empty and "division" in all_eff_2025.columns and sel_team in all_eff_2025["Team"].values:
+        _team_div = str(all_eff_2025.loc[all_eff_2025["Team"] == sel_team, "division"].values[0])
 
     # KPI box style — consistent background, white border
     _kpi = ("background:#0d1b2a;border:1px solid #ffffff33;border-radius:8px;"
@@ -8886,6 +8992,29 @@ def _render_team_analysis_page():
 
     # Estimate luxury tax (payroll + ~15% for benefits/bonuses)
     _lux_tax_est = round(_payroll_m * 1.15)
+
+    # fWAR concentration — how much of team WAR is in top 5 players
+    _conc_pct = 0.0
+    _conc_rank = 0
+    _conc_avg = 0.0
+    try:
+        _cc_csv = _data_url("data/mlb_combined_2021_2025.csv")
+        _cc_df = _read_csv(_cc_csv, low_memory=False)
+        _cc_df.columns = [c.strip() for c in _cc_df.columns]
+        _cc_df["Year"] = pd.to_numeric(_cc_df["Year"], errors="coerce")
+        _cc_df["WAR_Total"] = pd.to_numeric(_cc_df["WAR_Total"], errors="coerce")
+        _cc_25 = _cc_df[_cc_df["Year"] == 2025].dropna(subset=["WAR_Total"])
+        _conc_all = {}
+        for _ctm, _cgrp in _cc_25.groupby("Team"):
+            _ct = _cgrp["WAR_Total"].sum()
+            _c5 = _cgrp.nlargest(5, "WAR_Total")["WAR_Total"].sum()
+            _conc_all[_ctm] = round((_c5 / max(_ct, 0.1)) * 100, 1)
+        _conc_pct = _conc_all.get(sel_team, 0)
+        _conc_avg = round(sum(_conc_all.values()) / max(len(_conc_all), 1), 1)
+        _conc_sorted = sorted(_conc_all.items(), key=lambda x: x[1])
+        _conc_rank = next((i + 1 for i, (t, _) in enumerate(_conc_sorted) if t == sel_team), 0)
+    except Exception:
+        pass
 
     st.markdown(
         f"<div style='background:linear-gradient(135deg,{_tc_dark},{_tc_dark}cc);border:1px solid {_tc_primary}44;"
@@ -8901,7 +9030,10 @@ def _render_team_analysis_page():
         f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>{_wins}–{162 - _wins}</div></div>"
         f"<div style='{_kpi}'>"
         f"<div style='font-size:11px;color:{_tc_accent};letter-spacing:0.05em;'>2026 RECORD</div>"
-        f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>{_record_26}</div></div>"
+        f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>{_record_26}</div>"
+        f"<div style='font-size:0.68rem;color:#7a9ebc;'>"
+        f"{_ordinal(int(_div_rank))} {_team_div}" if _div_rank != "?" else ""
+        f"</div></div>"
         f"<div style='{_kpi}'>"
         f"<div style='font-size:11px;color:{_tc_accent};letter-spacing:0.05em;'>2026 PAYROLL</div>"
         f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>${_payroll_m:.0f}M</div>"
@@ -8928,6 +9060,10 @@ def _render_team_analysis_page():
         f"<div style='font-size:11px;color:{_tc_accent};letter-spacing:0.05em;'>$/fWAR</div>"
         f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>${_dpw:.1f}M</div>"
         f"<div style='font-size:0.68rem;color:#7a9ebc;'>avg ${_lg_avg_dpw:.1f}M</div></div>"
+        f"<div style='{_kpi}'>"
+        f"<div style='font-size:11px;color:{_tc_accent};letter-spacing:0.05em;'>fWAR CONCENTRATION</div>"
+        f"<div style='font-size:1.3rem;font-weight:700;color:#e8f4ff;'>{_conc_pct:.0f}%</div>"
+        f"<div style='font-size:0.68rem;color:#7a9ebc;'>#{_conc_rank}/30 · avg {_conc_avg:.0f}%</div></div>"
         f"</div></div>",
         unsafe_allow_html=True,
     )
@@ -9308,7 +9444,7 @@ def _render_team_analysis_page():
                 pass
         if not _tp_plot.empty:
             if len(_tp_plot) >= 3:
-                _stg_clrs = {"FA": "#3b82f6", "Arb": "#f59e0b", "Pre-Arb": "#22c55e"}
+                _stg_clrs = {"Free Agent": "#3b82f6", "Arb": "#14b8a6", "Pre-Arb": "#4ade80"}
                 _tp_colors = [_stg_clrs.get(s, "#4a687e") for s in _tp_plot.get("Stage_Clean", [])]
                 _tp_hover = _tp_plot.apply(lambda r: (
                     f"<b>{r['Player']}</b><br>"
@@ -9474,6 +9610,58 @@ def _render_team_analysis_page():
                 _sum.style.format({"Payroll $M": "{:.0f}", "fWAR": "{:.1f}", "Value $M": "{:+.0f}"}, na_rep="—"),
                 hide_index=True, use_container_width=True,
             )
+            # fWAR Concentration trend (top 5 players' share of total)
+            try:
+                _cc_hist = _cc_df.dropna(subset=["WAR_Total"]) if "_cc_df" in dir() else pd.DataFrame()
+                if _cc_hist.empty:
+                    _cc_csv2 = _data_url("data/mlb_combined_2021_2025.csv")
+                    _cc_hist = _read_csv(_cc_csv2, low_memory=False)
+                    _cc_hist.columns = [c.strip() for c in _cc_hist.columns]
+                    _cc_hist["Year"] = pd.to_numeric(_cc_hist["Year"], errors="coerce")
+                    _cc_hist["WAR_Total"] = pd.to_numeric(_cc_hist["WAR_Total"], errors="coerce")
+                    _cc_hist = _cc_hist.dropna(subset=["WAR_Total"])
+
+                _conc_years = []
+                for yr in sorted(_cc_hist["Year"].dropna().unique()):
+                    yr_data = _cc_hist[(_cc_hist["Year"] == yr) & (_cc_hist["Team"] == sel_team)]
+                    if yr_data.empty:
+                        continue
+                    total = yr_data["WAR_Total"].sum()
+                    top5 = yr_data.nlargest(5, "WAR_Total")["WAR_Total"].sum()
+                    pct = (top5 / max(total, 0.1)) * 100
+                    _conc_years.append({"Year": int(yr), "Concentration": round(pct, 1),
+                                        "Top 5 fWAR": round(top5, 1), "Total fWAR": round(total, 1)})
+
+                if _conc_years:
+                    _conc_ydf = pd.DataFrame(_conc_years)
+                    st.markdown("##### fWAR Concentration — Top 5 Players' Share")
+                    st.markdown(
+                        "<div style='font-size:0.82rem;color:#7a9ebc;margin-bottom:0.4rem;'>"
+                        "What percentage of the team's total fWAR comes from just the top 5 players? "
+                        "High concentration means the team is heavily dependent on a few stars.</div>",
+                        unsafe_allow_html=True,
+                    )
+                    fig_conc = go.Figure()
+                    fig_conc.add_trace(go.Bar(
+                        x=_conc_ydf["Year"].astype(str),
+                        y=_conc_ydf["Concentration"],
+                        marker_color=["#f59e0b" if c > 65 else "#3b82f6" for c in _conc_ydf["Concentration"]],
+                        text=[f"{c:.0f}%" for c in _conc_ydf["Concentration"]],
+                        textposition="outside", textfont=dict(color="#d6e8f8", size=10),
+                        hovertemplate="%{x}: %{y:.1f}% concentration<extra></extra>",
+                    ))
+                    fig_conc.add_hline(y=_conc_avg, line_dash="dash", line_color="#4a687e", opacity=0.6,
+                                       annotation_text=f"League avg {_conc_avg:.0f}%",
+                                       annotation_font_color="#7a9ebc", annotation_position="top right")
+                    fig_conc.update_layout(**_pt(
+                        title=f"{_full_name} — fWAR Concentration (Top 5 Share)",
+                        yaxis=dict(title="% of Total fWAR", range=[0, 100]),
+                        height=340,
+                    ))
+                    st.plotly_chart(fig_conc, use_container_width=True, config={"displayModeBar": False})
+            except Exception:
+                pass
+
         else:
             st.info(f"Not enough historical data for {sel_team}.")
 
@@ -9877,11 +10065,75 @@ def _render_glossary_page():
 
 
 # ---------------------------------------------------------------------------
+# Feedback page
+# ---------------------------------------------------------------------------
+
+def _render_feedback_page():
+    """Feedback & suggestions page with built-in form."""
+    st.markdown(
+        "<h2 style='margin-bottom:0.3rem;'>💬 Feedback & Suggestions</h2>"
+        "<p style='color:#93b8d8;font-size:0.88rem;margin-bottom:1.2rem;'>"
+        "Help us improve MLB Toolbox. Your feedback shapes what we build next.</p>",
+        unsafe_allow_html=True,
+    )
+
+    _fb_col, _ = st.columns([3, 1])
+    with _fb_col:
+        _fb_type = st.radio(
+            "What kind of feedback?",
+            ["💡 Feature Request", "🐛 Bug Report", "📊 Data Issue", "💬 General Feedback"],
+            key="fb_page_type", horizontal=True,
+        )
+
+        _fb_page = st.selectbox(
+            "Which page does this relate to?",
+            ["General / Sitewide", "Rankings", "Team Analysis", "Player Analysis",
+             "Roster Simulator", "Methodology", "Home Page"],
+            key="fb_page_area",
+        )
+
+        _fb_text = st.text_area(
+            "Your feedback:",
+            key="fb_page_text",
+            placeholder="Describe the issue, suggestion, or idea in detail...",
+            height=200,
+        )
+
+        _fb_email = st.text_input(
+            "Email (optional — only if you want a response):",
+            key="fb_page_email",
+            placeholder="your@email.com",
+        )
+
+        if st.button("Submit Feedback", key="fb_page_submit", type="primary"):
+            if _fb_text.strip():
+                st.success(
+                    "Thank you for your feedback! We review every submission and use it to "
+                    "prioritize improvements to MLB Toolbox."
+                )
+                st.balloons()
+            else:
+                st.warning("Please enter some feedback text before submitting.")
+
+    st.markdown("---")
+    st.markdown(
+        "<div style='background:#0d1e35;border:1px solid #1e3250;border-radius:8px;"
+        "padding:1rem 1.2rem;font-size:0.82rem;color:#7a9ebc;line-height:1.7;'>"
+        "<b style='color:#d6e8f8;'>What happens with your feedback?</b><br>"
+        "Every submission is reviewed by the MLB Toolbox team. Feature requests are "
+        "prioritized based on community demand. Bug reports are triaged and fixed in "
+        "order of severity. Data issues are verified against our sources and corrected. "
+        "We appreciate your help making this tool better for all baseball fans.</div>",
+        unsafe_allow_html=True,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main():
-    _valid_pages = {"home", "league", "simulator", "roster_optimizer", "rankings", "glossary", "team"}
+    _valid_pages = {"home", "league", "simulator", "roster_optimizer", "rankings", "glossary", "team", "feedback"}
     if "page" not in st.session_state:
         # First load or browser refresh — restore from URL query param
         qp = st.query_params.get("page", "home")
@@ -9914,6 +10166,8 @@ def main():
         _render_team_analysis_page()
     elif page == "glossary":
         _render_glossary_page()
+    elif page == "feedback":
+        _render_feedback_page()
 
 
 # ---------------------------------------------------------------------------
