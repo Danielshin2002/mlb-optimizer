@@ -8845,26 +8845,33 @@ def _render_team_analysis_page():
     # CSS to make team picker buttons transparent with logo overlay
     st.markdown("""<style>
     /* Team picker: hide the spacer buttons below logos */
-    .team-picker-zone [data-testid="stButton"] {
-        margin-top: -0.5rem !important;
-        height: 0.1px !important;
+    .team-picker-zone [data-testid="stButton"] > button {
+        background: transparent !important;
+        border: transparent !important;
+        box-shadow: none !important;
+        color: transparent !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+        height: 1px !important;
+        font-size: 0 !important;
+        margin: 0 !important;
         overflow: hidden !important;
-        opacity: 0.01 !important;
     }
     </style>""", unsafe_allow_html=True)
 
     def _logo_card(tm, is_active):
         _url = _team_logo_url(tm)
-        _bdr = "2px solid #3b82f6" if is_active else "none"
+        _bdr = "2px solid #3b82f6" if is_active else "1px solid transparent"
         _bg = "rgba(59,130,246,0.1)" if is_active else "transparent"
         _shadow = "box-shadow:0 0 12px #3b82f644;" if is_active else ""
+        _name = _ABBR_TO_FULL.get(tm, tm)
         return (
             f'<div style="background:{_bg};border:{_bdr};border-radius:8px;'
-            f'padding:4px;text-align:center;{_shadow}" '
-            f'title="{_TEAM_CITIES.get(tm, "")} {_ABBR_TO_FULL.get(tm, tm)}">'
+            f'padding:4px 4px 2px;text-align:center;{_shadow}">'
             f'<img src="{_url}" width="55" height="55" style="object-fit:contain;" '
             f'onerror="this.outerHTML=\'<div style=&quot;font-size:1rem;font-weight:700;'
             f'color:#e8f4ff;line-height:55px;&quot;>{tm}</div>\'">'
+            f'<div style="font-size:0.62rem;font-weight:700;color:#e8f4ff;margin-top:2px;">{_name}</div>'
             f'</div>'
         )
 
