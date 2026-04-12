@@ -7841,61 +7841,26 @@ def _render_rankings_page():
     def _full(row):
         return row.get("Team_Full") or row["Team"]
 
-    qa1, qa2, qa3 = st.columns(3)
-    qa4, qa5, qa6 = st.columns(3)
-
-    with qa1:
-        st.markdown(_qa(
-            "🏆", "MOST EFFICIENT",
-            _full(_best_eff),
-            f"${_best_eff['dollar_gap_M']:.0f}M below the line",
-            "#1e4a1e",
-            "This team won the most games relative to payroll $ spent",
-            team_abbr=_best_eff["Team"],
-        ), unsafe_allow_html=True)
-    with qa2:
-        st.markdown(_qa(
-            "📈", "TOP OVERPERFORMER",
-            _full(_overperf),
-            f"+{_overperf['wins_vs_pred']:.1f} wins vs forecast",
-            "#0c2218",
-            "This team had the most wins relative to forecast based on payroll $ spent",
-            team_abbr=_overperf["Team"],
-        ), unsafe_allow_html=True)
-    with qa3:
-        st.markdown(_qa(
-            "💰", "BEST &#36;/fWAR",
-            _full(_best_dpw),
-            f"&#36;{_best_dpw['DPW']:.1f}M per fWAR",
-            "#1a1228",
-            "",
-            team_abbr=_best_dpw["Team"],
-        ), unsafe_allow_html=True)
-    with qa4:
-        st.markdown(_qa(
-            "🔴", "LEAST EFFICIENT",
-            _full(_worst_eff),
-            f"${_worst_eff['dollar_gap_M']:.0f}M above the line",
-            "#3d1f00",
-            "This team spent the most payroll $ for level of wins earned",
-            team_abbr=_worst_eff["Team"],
-        ), unsafe_allow_html=True)
-    with qa5:
-        st.markdown(_qa(
-            "⭐", "TOP fWAR",
-            _full(_top_war),
-            f"{_top_war['team_WAR']:.1f} total fWAR",
-            tooltip="Highest total roster fWAR — sum of all player contributions above replacement",
-            team_abbr=_top_war["Team"],
-        ), unsafe_allow_html=True)
-    with qa6:
-        st.markdown(_qa(
-            "🏅", "MOST WINS",
-            _full(_top_wins),
-            f"{int(_top_wins['Wins'])} wins",
-            tooltip="Highest regular-season win total for the selected year",
-            team_abbr=_top_wins["Team"],
-        ), unsafe_allow_html=True)
+    # All 6 team award boxes in a single CSS grid
+    _boxes = "".join([
+        _qa("🏆", "MOST EFFICIENT", _full(_best_eff),
+            f"${_best_eff['dollar_gap_M']:.0f}M below the line", "#1e4a1e", "", _best_eff["Team"]),
+        _qa("📈", "TOP OVERPERFORMER", _full(_overperf),
+            f"+{_overperf['wins_vs_pred']:.1f} wins vs forecast", "#0c2218", "", _overperf["Team"]),
+        _qa("💰", "BEST &#36;/fWAR", _full(_best_dpw),
+            f"&#36;{_best_dpw['DPW']:.1f}M per fWAR", "#1a1228", "", _best_dpw["Team"]),
+        _qa("🔴", "LEAST EFFICIENT", _full(_worst_eff),
+            f"${_worst_eff['dollar_gap_M']:.0f}M above the line", "#3d1f00", "", _worst_eff["Team"]),
+        _qa("⭐", "TOP fWAR", _full(_top_war),
+            f"{_top_war['team_WAR']:.1f} total fWAR", team_abbr=_top_war["Team"]),
+        _qa("🏅", "MOST WINS", _full(_top_wins),
+            f"{int(_top_wins['Wins'])} wins", team_abbr=_top_wins["Team"]),
+    ])
+    st.markdown(
+        f"<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:8px;'>"
+        f"{_boxes}</div>",
+        unsafe_allow_html=True,
+    )
 
     # ── Player award boxes (top fWAR, best contract value, best stability) ──
     try:
@@ -7947,35 +7912,26 @@ def _render_rankings_page():
                 + "</div>"
             )
 
-        pa1, pa2, pa3 = st.columns(3)
+        _pboxes = ""
         if _p_top_war is not None:
-            with pa1:
-                st.markdown(_player_card(
-                    f"#1 fWAR ({sel_year})",
-                    str(_p_top_war["Player"]),
-                    str(_p_top_war["Team"]),
-                    f"{_p_top_war['WAR_Total']:.1f} fWAR",
-                ), unsafe_allow_html=True)
+            _pboxes += _player_card(f"#1 fWAR ({sel_year})", str(_p_top_war["Player"]),
+                                     str(_p_top_war["Team"]), f"{_p_top_war['WAR_Total']:.1f} fWAR")
         if _p_best_val is not None:
-            with pa2:
-                st.markdown(_player_card(
-                    "TOP CONTRACT VALUE",
-                    str(_p_best_val["Player"]),
-                    str(_p_best_val["Team"]),
-                    f"{_p_best_val['_wpm']:.2f} fWAR/$M",
-                    f"{_p_best_val['WAR_Total']:.1f} fWAR · ${_p_best_val['Salary_M']:.1f}M",
-                ), unsafe_allow_html=True)
+            _pboxes += _player_card("TOP CONTRACT VALUE", str(_p_best_val["Player"]),
+                                     str(_p_best_val["Team"]), f"{_p_best_val['_wpm']:.2f} fWAR/&#36;M",
+                                     f"{_p_best_val['WAR_Total']:.1f} fWAR · &#36;{_p_best_val['Salary_M']:.1f}M")
         if _p_best_wsr is not None:
-            with pa3:
-                st.markdown(_player_card(
-                    "BEST fWAR STABILITY",
-                    str(_p_best_wsr["Player"]),
-                    str(_p_best_wsr["Team"]),
-                    f"{_p_best_wsr['WSR']:.2f} WSR",
-                    f"Avg {_p_best_wsr['_mean']:.1f} fWAR · {int(_p_best_wsr['_n'])} seasons",
-                ), unsafe_allow_html=True)
+            _pboxes += _player_card("BEST fWAR STABILITY", str(_p_best_wsr["Player"]),
+                                     str(_p_best_wsr["Team"]), f"{_p_best_wsr['WSR']:.2f} WSR",
+                                     f"Avg {_p_best_wsr['_mean']:.1f} fWAR · {int(_p_best_wsr['_n'])} seasons")
+        if _pboxes:
+            st.markdown(
+                f"<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;'>"
+                f"{_pboxes}</div>",
+                unsafe_allow_html=True,
+            )
     except Exception:
-        pass  # silently skip if data unavailable
+        pass
 
     st.markdown("<div style='margin-top:0.8rem;'></div>", unsafe_allow_html=True)
 
