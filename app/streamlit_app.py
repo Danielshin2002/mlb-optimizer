@@ -8844,45 +8844,24 @@ def _render_team_analysis_page():
         st.session_state["team_analysis_sel"] = "NYY"
     sel_team = st.session_state.get("team_analysis_sel", "NYY")
 
-    # CSS to make team picker buttons transparent with logo overlay
-    st.markdown("""<style>
-    /* Team picker: hide the spacer buttons below logos */
-    .team-picker-zone [data-testid="stButton"] {
-        height: 0 !important;
-        overflow: hidden !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        min-height: 0 !important;
-        max-height: 0 !important;
-        opacity: 0 !important;
-        pointer-events: auto !important;
-        position: relative !important;
-    }
-    .team-picker-zone [data-testid="stButton"] > button {
-        position: absolute !important;
-        top: -70px !important;
-        left: 0 !important;
-        right: 0 !important;
-        height: 80px !important;
-        opacity: 0 !important;
-        cursor: pointer !important;
-    }
-    </style>""", unsafe_allow_html=True)
-
-    def _logo_card(tm, is_active):
+    def _logo_card_html(tm, is_active):
         _url = _team_logo_url(tm)
         _bdr = "2px solid #3b82f6" if is_active else "1px solid transparent"
         _bg = "rgba(59,130,246,0.1)" if is_active else "transparent"
         _shadow = "box-shadow:0 0 12px #3b82f644;" if is_active else ""
         _name = _ABBR_TO_FULL.get(tm, tm)
         return (
+            f'<a href="?page=team&sel_team={tm}" target="_self" style="text-decoration:none;">'
             f'<div style="background:{_bg};border:{_bdr};border-radius:8px;'
-            f'padding:4px 4px 2px;text-align:center;{_shadow}">'
+            f'padding:6px 4px 4px;text-align:center;{_shadow}cursor:pointer;'
+            f'transition:transform 0.15s;" '
+            f'onmouseover="this.style.transform=\'translateY(-2px)\'" '
+            f'onmouseout="this.style.transform=\'none\'">'
             f'<img src="{_url}" width="55" height="55" style="object-fit:contain;" '
             f'onerror="this.outerHTML=\'<div style=&quot;font-size:1rem;font-weight:700;'
             f'color:#e8f4ff;line-height:55px;&quot;>{tm}</div>\'">'
-            f'<div style="font-size:0.72rem;font-weight:700;color:#e8f4ff;margin-top:3px;">{_name}</div>'
-            f'</div>'
+            f'<div style="font-size:0.75rem;font-weight:700;color:#e8f4ff;margin-top:3px;">{_name}</div>'
+            f'</div></a>'
         )
 
     def _render_league_grid(league_name, divs):
@@ -8892,30 +8871,20 @@ def _render_team_analysis_page():
             unsafe_allow_html=True,
         )
         for div_name, teams in divs:
+            cards = "".join(_logo_card_html(tm, tm == sel_team) for tm in teams)
             st.markdown(
                 f"<div style='font-size:0.62rem;color:#d6e8f8;font-weight:600;"
-                f"margin:0.15rem 0 0.08rem;'>{div_name}</div>",
+                f"margin:0.2rem 0 0.1rem;'>{div_name}</div>"
+                f"<div style='display:grid;grid-template-columns:repeat(5,1fr);gap:6px;"
+                f"margin-bottom:6px;'>{cards}</div>",
                 unsafe_allow_html=True,
             )
-            tcols = st.columns(5)
-            for ti, tm in enumerate(teams):
-                is_active = tm == sel_team
-                with tcols[ti]:
-                    # Logo card first
-                    st.markdown(_logo_card(tm, is_active), unsafe_allow_html=True)
-                    # Clickable button overlaid on top (visually hidden)
-                    if st.button(" ", key=f"tpick_{tm}", use_container_width=True):
-                        st.session_state["team_analysis_sel"] = tm
-                        st.rerun()
 
-    with st.container():
-        st.markdown("<div class='team-picker-zone'>", unsafe_allow_html=True)
-        al_col, nl_col = st.columns(2, gap="medium")
-        with al_col:
-            _render_league_grid("American League", _AL_DIVS)
-        with nl_col:
-            _render_league_grid("National League", _NL_DIVS)
-        st.markdown("</div>", unsafe_allow_html=True)
+    al_col, nl_col = st.columns(2, gap="medium")
+    with al_col:
+        _render_league_grid("American League", _AL_DIVS)
+    with nl_col:
+        _render_league_grid("National League", _NL_DIVS)
 
     # Spacer between team picker and content
     st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
