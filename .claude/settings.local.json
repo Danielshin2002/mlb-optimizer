@@ -1,13 +1,24 @@
 {
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "permissions": {
     "allow": [
       "Bash(unzip -l \"2026 Payroll.zip\")",
       "Bash(unzip -p \"2026 Payroll.zip\" \"2026 Payroll/Angels-Payroll-2026.xlsx\")",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "Bash(grep -n \"Efficiency Gap\\\\|efficiency gap\\\\|Gap $M\\\\|Avg Gap\\\\|dollar_gap\\\\|Efficiency</div>\" app/streamlit_app.py)",
+      "Bash(grep -n \"Gap $M.*Postseason\" app/streamlit_app.py)",
+      "Bash(find '/c/Users/Ethan Davis' -name efficiency_detail*)",
+      "Bash(grep -n \"Value $M.*Postseason\" app/streamlit_app.py)",
+      "Bash(sed -i \"s/;text-transform:uppercase;''>2025 Record/;letter-spacing:0.05em;''>2025 RECORD/g\" app/streamlit_app.py)",
+      "Bash(sed -i \"s/;text-transform:uppercase;''>2026 Record/;letter-spacing:0.05em;''>2026 RECORD/g\" app/streamlit_app.py)",
+      "Bash(sed -i \"s/;text-transform:uppercase;''>2026 Payroll/;letter-spacing:0.05em;''>2026 PAYROLL/g\" app/streamlit_app.py)",
+      "Bash(sed -i \"s/;text-transform:uppercase;''>Lux Tax Est./;letter-spacing:0.05em;''>LUX TAX EST./g\" app/streamlit_app.py)",
+      "Bash(sed -i \"s/;text-transform:uppercase;''>Spend Efficiency/;letter-spacing:0.05em;''>SPEND EFFICIENCY/g\" app/streamlit_app.py)",
+      "Bash(cd:*)",
+      "Bash(grep -n \"$/fWAR.*_dpw\" app/streamlit_app.py)"
     ]
-  },
-  "attribution": {
-    "commit": "",
-    "pr": ""
   }
 }
