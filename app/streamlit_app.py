@@ -2802,286 +2802,147 @@ def _render_player_card(player_name: str, combined_path: str, file_hash: str):
 # ---------------------------------------------------------------------------
 
 def _render_home_page():
-    """Landing page: 3 faded carousel rows as background, feature cards in foreground."""
-    _CARDS = [
-        ("rankings",  "🏆", "Rankings",
-         "All 30 MLB teams ranked by efficiency, fWAR, payroll, and win performance. "
-         "See which franchises get the most wins per dollar and which are overspending."),
-        ("team",      "🏟️", "Team Analysis",
-         "Deep dive into the spending efficiency of your favorite team."),
-        ("league",    "📊", "Player Analysis",
-         "Player-level cost effective line, PPEL regression, fWAR stability ratings, "
-         "and age trajectory analysis across 4,000+ player-seasons."),
-        ("simulator", "🎮", "Roster Simulator",
-         "Build customized MLB rosters to optimize pay vs performance efficiency."),
-        ("glossary",  "📖", "Methodology",
-         "How we calculate every metric, where the data comes from, and what it all means."),
+    """Landing page: Stadium Tunnel + Starting Lineup concept."""
+
+    # Player headshots for tunnel walls (top fWAR leaders)
+    _mlbam_lk = _cached_mlbam_lookup(_RAZZBALL_PATH)
+    def _hs(name):
+        mid = _mlbam_lk.get(_fix_player_name(name), "")
+        return _headshot_url(mid, width=96) if mid else ""
+
+    _left_players = [("Aaron Judge", _hs("Aaron Judge")),
+                     ("Shohei Ohtani", _hs("Shohei Ohtani")),
+                     ("Cal Raleigh", _hs("Cal Raleigh")),
+                     ("Bobby Witt Jr.", _hs("Bobby Witt Jr."))]
+    _right_players = [("Tarik Skubal", _hs("Tarik Skubal")),
+                      ("Corbin Carroll", _hs("Corbin Carroll")),
+                      ("Paul Skenes", _hs("Paul Skenes")),
+                      ("Trea Turner", _hs("Trea Turner"))]
+
+    # Dynamic stats for lineup badges
+    try:
+        _det = _read_csv(_data_url("efficiency_detail.csv"))
+        _det25 = _det[_det["Year"] == 2025]
+        _best_team = _det25.loc[_det25["dollar_gap_M"].idxmin()]
+        _badge_rank = f"{_best_team['Team']} ${_best_team['dollar_gap_M']:.0f}M"
+    except Exception:
+        _badge_rank = "30 teams"
+
+    _lineup = [
+        ("rankings", "Rankings", "Efficiency rankings across all 30 MLB teams", "SS", _badge_rank, "#5dc9a5"),
+        ("team", "Team Analysis", "Deep-dive into any team's spending and roster", "CF", "30 teams", "#7a9ebc"),
+        ("league", "Player Analysis", "fWAR vs salary for every player (2021–2025)", "RF", "4,000+ players", "#7a9ebc"),
+        ("simulator", "Roster Simulator", "Build custom rosters and optimize efficiency", "DH", "Full pool", "#7a9ebc"),
+        ("glossary", "Methodology", "How every metric is calculated and sourced", "P", "Transparent", "#7a9ebc"),
     ]
 
     # ------------------------------------------------------------------
-    # CSS
+    # Build tunnel player images HTML
     # ------------------------------------------------------------------
-    st.markdown("""
-    <style>
-    /* ── wrapper — full-width, no box, same bg as app ────────────── */
-    .home-wrap {
-        position: relative;
-        min-height: 100vh;
-        overflow: hidden;
-        background: #111927;
-    }
+    def _wall_imgs(players, side):
+        html = ""
+        for i, (name, url) in enumerate(players):
+            if not url:
+                continue
+            op = max(0.15, 0.5 - i * 0.1)
+            pos = f"{'left' if side == 'L' else 'right'}:12px;top:{20 + i * 72}px;"
+            html += (f"<img src='{url}' style='position:absolute;{pos}width:48px;height:60px;"
+                     f"object-fit:cover;border-radius:6px;opacity:{op};' "
+                     f"onerror=\"this.style.display='none'\">")
+        return html
 
-    /* ── background carousel layer ───────────────────────────────── */
-    .home-bg {
-        position: absolute;
-        inset: 0;
-        z-index: 0;
-        pointer-events: none;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-evenly;
-        padding: 10px 0;
-        opacity: 0.08;
-    }
-    .cr-row   { overflow: hidden; }
-    .cr-track { display: flex; width: max-content; }
+    _left_wall = _wall_imgs(_left_players, "L")
+    _right_wall = _wall_imgs(_right_players, "R")
 
-    .cr-go-l1 { animation: go-l 200s linear infinite; }
-    .cr-go-r  { animation: go-r 200s linear infinite; }
-    .cr-go-l3 { animation: go-l 200s linear infinite; animation-delay: -60s; }
-
-    @keyframes go-r {
-        0%   { transform: translateX(-50%); }
-        100% { transform: translateX(0);    }
-    }
-    @keyframes go-l {
-        0%   { transform: translateX(0);    }
-        100% { transform: translateX(-50%); }
-    }
-    .cr-img {
-        width: 260px; height: 260px;
-        object-fit: cover; object-position: top center;
-        border-radius: 10px; margin: 0 10px; flex-shrink: 0;
-    }
-
-    /* ── foreground layer ─────────────────────────────────────────── */
-    .home-fg {
-        position: relative;
-        z-index: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        gap: 0.4rem;
-        padding: 0.8rem 2rem 2rem;
-    }
-    /* gradient only on the text — emoji lives in its own span */
-    .home-title-grad {
-        font-size: 3.8rem; font-weight: 900;
-        background: linear-gradient(135deg, #60a5fa 0%, #93c5fd 50%, #dbeafe 100%);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        background-clip: text;
-        line-height: 1.15; letter-spacing: -2px;
-        vertical-align: middle;
-    }
-    /* baseball emoji — no gradient, natural colour, vertically aligned */
-    .home-ball {
-        font-size: 3.8rem; line-height: 1.15;
-        -webkit-text-fill-color: initial;
-        vertical-align: middle;
-        margin-left: 0.15em;
-    }
-    .home-sub {
-        font-size: 0.88rem; color: #5a8aaa; letter-spacing: 0.22em;
-        text-transform: uppercase; text-align: center;
-    }
-    .home-mission {
-        font-size: 0.95rem; color: #93b8d8; text-align: center;
-        max-width: 720px; line-height: 1.7; margin: 0.5rem auto;
-    }
-    /* stationary tagline */
-    .home-ticker {
-        width: 100%; text-align: center;
-        font-size: 0.82rem; color: #5a8aaa; letter-spacing: 0.22em;
-        text-transform: uppercase; margin-bottom: 0.4rem;
-        font-weight: 600;
-    }
-    .home-rule {
-        width: 52%; border: none;
-        border-top: 1px solid rgba(96,165,250,0.18); margin: 0.3rem 0;
-    }
-    .home-cta {
-        font-size: 0.88rem; color: #5a8aaa; letter-spacing: 0.14em;
-        text-transform: uppercase; margin-top: 0.3rem;
-    }
-    /* card grid inside wrapper */
-    .h-grid {
-        display: grid;
-        grid-template-columns: repeat(5, 1fr);
-        gap: 1rem;
-        width: 100%;
-        max-width: 1300px;
-        margin-top: 0.8rem;
-    }
-    .h-card {
-        background: rgba(17, 25, 39, 0.88);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(96,165,250,0.22);
-        border-radius: 14px;
-        padding: 1.5rem 1.1rem 1.3rem;
-        text-align: center;
-        display: flex; flex-direction: column;
-        align-items: center; gap: 0.5rem;
-        transition: border-color 0.2s, box-shadow 0.2s, transform 0.18s;
-    }
-    .h-card:hover {
-        border-color: rgba(96,165,250,0.55);
-        box-shadow: 0 4px 22px rgba(96,165,250,0.14);
-        transform: translateY(-2px);
-    }
-    .h-icon  { font-size: 2.8rem; line-height: 1; }
-    .h-title { font-size: 1.12rem; font-weight: 700; color: #dbeafe; }
-    .h-desc  { font-size: 0.85rem; color: #7a9ebc; line-height: 1.6; flex: 1; }
-    .h-btn {
-        margin-top: 0.8rem;
-        padding: 0.42rem 1.4rem;
-        background: rgba(96,165,250,0.12);
-        border: 1px solid rgba(96,165,250,0.32);
-        border-radius: 7px;
-        color: #93c5fd;
-        font-size: 0.88rem; font-weight: 600;
-        text-decoration: none !important;
-        transition: background 0.18s, border-color 0.18s;
-        white-space: nowrap;
-    }
-    .h-card:hover .h-btn {
-        background: rgba(96,165,250,0.26);
-        border-color: rgba(96,165,250,0.6);
-        color: #dbeafe;
-    }
-
-    /* ── Home page — Tablet ──────────────────────────────────────── */
-    @media (max-width: 1024px) {
-        .h-grid { grid-template-columns: repeat(2, 1fr); max-width: 100%; }
-        .home-title-grad, .home-ball { font-size: 2.8rem; }
-        .home-fg { padding: 1.2rem 1rem 1.5rem; }
-        .cr-img  { width: 140px; height: 140px; }
-    }
-
-    /* ── Issue 4 — Home page cards mobile layout ────────────────── */
-    @media (max-width: 768px) {
-        .home-wrap {
-            min-height: auto;
-            overflow-x: hidden !important;
-        }
-        .home-fg {
-            min-height: auto;
-            padding: 2rem 12px 1.5rem;
-            gap: 0.35rem;
-        }
-        .h-grid {
-            grid-template-columns: 1fr;
-            gap: 0.7rem;
-            max-width: 100%;
-            padding: 0 12px;
-            overflow-x: hidden !important;
-        }
-        .h-card {
-            padding: 1rem 0.8rem 0.9rem;
-            border-radius: 10px;
-            word-wrap: break-word;
-            overflow: hidden;
-        }
-        .h-icon  { font-size: 1.8rem; }
-        .h-title { font-size: 0.85rem; }
-        .h-desc  { font-size: 0.68rem; }
-        .h-btn   {
-            padding: 0.4rem 1rem;
-            font-size: 0.75rem;
-            width: 100%;
-            text-align: center;
-        }
-        .home-title-grad, .home-ball { font-size: 2.2rem; }
-        .home-sub { font-size: 0.68rem; letter-spacing: 0.15em; }
-        .home-rule { width: 80%; }
-        .home-cta { font-size: 0.65rem; }
-        .cr-img { width: 120px; height: 120px; margin: 0 5px; border-radius: 6px; }
-    }
-
-    /* ── Home page — Small phone ─────────────────────────────────── */
-    @media (max-width: 480px) {
-        .home-title-grad, .home-ball { font-size: 1.8rem; }
-        .home-sub { font-size: 0.6rem; }
-        .cr-img { width: 75px; height: 75px; }
-        .home-fg { padding: 1.5rem 8px 1.2rem; }
-        .h-grid { padding: 0 8px; }
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # ------------------------------------------------------------------
-    # Build carousel: top-3 WAR per team from 2025 (all 30 teams represented)
-    # ------------------------------------------------------------------
-    _comb_url = _data_url("data/mlb_combined_2021_2025.csv")
-    _carousel_players = _build_carousel_players(_comb_url)
-    imgs = _cached_carousel_images(
-        _HEADSHOTS_DIR,
-        n=90,
-        seed=42,
-        player_list=tuple(_carousel_players) if _carousel_players else (),
-    )
-
-    def _strip(img_list: list, cls: str) -> str:
-        tags = "".join(
-            f'<img class="cr-img" src="data:image/png;base64,{b}" alt="">'
-            for b in img_list * 2   # duplicate for seamless loop
+    # Build lineup rows HTML
+    _lineup_html = ""
+    for i, (page, title, desc, pos, badge, badge_clr) in enumerate(_lineup):
+        _num_bg = "#1a2a44"
+        _num_clr = "#c9a94e" if i == 0 else "#4a90d9"
+        _num_bdr = "#c9a94e" if i == 0 else "#253d58"
+        _border = "border-bottom:1px solid #0e1828;" if i < len(_lineup) - 1 else ""
+        _lineup_html += (
+            f"<a href='?page={page}' target='_self' style='text-decoration:none;color:inherit;"
+            f"display:flex;align-items:center;padding:12px 16px;{_border}"
+            f"transition:background 0.15s;cursor:pointer;' "
+            f"onmouseover=\"this.style.background='rgba(255,255,255,0.03)'\" "
+            f"onmouseout=\"this.style.background='transparent'\">"
+            f"<div style='width:28px;height:28px;border-radius:50%;background:{_num_bg};"
+            f"border:1px solid {_num_bdr};display:flex;align-items:center;justify-content:center;"
+            f"font-size:12px;font-weight:700;color:{_num_clr};flex-shrink:0;'>{i+1}</div>"
+            f"<div style='flex:1;margin-left:12px;'>"
+            f"<div style='font-size:13px;font-weight:500;color:#e8f4ff;'>{title}</div>"
+            f"<div style='font-size:11px;color:#4a687e;margin-top:1px;'>{desc}</div></div>"
+            f"<div style='font-size:11px;color:#4a687e;margin-right:12px;'>{pos}</div>"
+            f"<div style='font-size:11px;color:{badge_clr};white-space:nowrap;'>{badge}</div>"
+            f"</a>"
         )
-        return f'<div class="cr-row"><div class="cr-track {cls}">{tags}</div></div>'
-
-    if imgs:
-        n = len(imgs)
-        t = n // 3
-        bg_rows = (
-            _strip(imgs,                    "cr-go-l1")  # row 1 → scrolls left
-          + _strip(imgs[t:]  + imgs[:t],    "cr-go-r")   # row 2 → scrolls right
-          + _strip(imgs[2*t:]+ imgs[:2*t],  "cr-go-l3")  # row 3 → scrolls left (phase-offset)
-        )
-    else:
-        bg_rows = ""
 
     # ------------------------------------------------------------------
-    # Build foreground card grid HTML
+    # Full page HTML
     # ------------------------------------------------------------------
-    cards_html = "".join(
-        f'<a class="h-card" href="?page={page_key}" target="_self" style="text-decoration:none;">'
-        f'<div class="h-icon">{icon}</div>'
-        f'<div class="h-title">{title}</div>'
-        f'<div class="h-desc">{desc}</div>'
-        f'<div class="h-btn">Open &#8594;</div>'
-        f'</a>'
-        for page_key, icon, title, desc in _CARDS
-    )
-
     # ------------------------------------------------------------------
-    # Render: carousel background fills the page, foreground overlays
+    # Render stadium tunnel + lineup card
     # ------------------------------------------------------------------
     st.markdown(f"""
-    <div class="home-wrap">
-      <div class="home-bg">{bg_rows}</div>
-      <div class="home-fg">
-        <div class="home-ticker">MLB Toolbox: Built by fans for fans</div>
-        <div style="text-align:center;display:flex;align-items:center;justify-content:center;">
-          <span class="home-title-grad">MLB Toolbox</span><span class="home-ball">&#9918;</span>
-        </div>
-        <div class="home-mission">
-          Providing visualization tools and metrics to better<br>track, rank, and forecast team and player cost per performance efficiency
-        </div>
-        <hr class="home-rule">
-        <div class="home-cta">Choose a tool to get started</div>
-        <div class="h-grid">{cards_html}</div>
+    <style>
+    @keyframes gold-pulse {{ 0%,100%{{opacity:0.5;}} 50%{{opacity:1;}} }}
+    @keyframes row-in {{ from{{opacity:0;transform:translateX(-8px);}} to{{opacity:1;transform:translateX(0);}} }}
+    </style>
+
+    <!-- Tunnel Section -->
+    <div style="position:relative;min-height:320px;background:#080e1a;overflow:hidden;
+                border-radius:0 0 12px 12px;margin:-1rem -1rem 0 -1rem;padding:0 1rem;">
+
+      <!-- Gold tunnel lines -->
+      <div style="position:absolute;left:60px;top:0;bottom:0;width:1px;background:linear-gradient(180deg,transparent,#c9a94e22,transparent);"></div>
+      <div style="position:absolute;right:60px;top:0;bottom:0;width:1px;background:linear-gradient(180deg,transparent,#c9a94e22,transparent);"></div>
+      <div style="position:absolute;left:61px;top:30%;width:40px;height:1px;background:#c9a94e18;"></div>
+      <div style="position:absolute;left:61px;top:55%;width:30px;height:1px;background:#c9a94e10;"></div>
+      <div style="position:absolute;right:61px;top:35%;width:40px;height:1px;background:#c9a94e18;"></div>
+      <div style="position:absolute;right:61px;top:60%;width:30px;height:1px;background:#c9a94e10;"></div>
+
+      <!-- Left wall headshots -->
+      {_left_wall}
+      <!-- Right wall headshots -->
+      {_right_wall}
+
+      <!-- Dark gradient overlays on edges -->
+      <div style="position:absolute;left:0;top:0;bottom:0;width:100px;
+                  background:linear-gradient(90deg,#080e1a,transparent);z-index:1;"></div>
+      <div style="position:absolute;right:0;top:0;bottom:0;width:100px;
+                  background:linear-gradient(270deg,#080e1a,transparent);z-index:1;"></div>
+
+      <!-- Center content -->
+      <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;
+                  justify-content:center;min-height:320px;text-align:center;">
+        <div style="font-size:11px;color:#c9a94e;letter-spacing:3px;text-transform:uppercase;
+                    animation:gold-pulse 3s ease-in-out infinite;margin-bottom:8px;">ENTERING THE FIELD</div>
+        <div style="font-size:28px;font-weight:500;color:#e8f4ff;margin-bottom:4px;">MLB Toolbox</div>
+        <div style="font-size:13px;color:#4a687e;">Data-driven baseball analysis</div>
       </div>
+    </div>
+
+    <!-- Tunnel floor line -->
+    <div style="height:3px;background:linear-gradient(90deg,transparent 5%,#1e3050 50%,transparent 95%);margin:0 -1rem;"></div>
+    <div style="height:1px;background:linear-gradient(90deg,transparent 10%,#2a5a3a44 50%,transparent 90%);margin:0 -1rem 1.5rem;"></div>
+
+    <!-- Lineup Card -->
+    <div style="max-width:480px;margin:0 auto;background:#0b1422;border:1px solid #1e3050;border-radius:8px;overflow:hidden;">
+      <!-- Card header -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;
+                  border-bottom:1px solid #0e1828;">
+        <span style="font-size:13px;font-weight:500;color:#e8f4ff;">Today's lineup</span>
+        <span style="font-size:10px;color:#4a687e;letter-spacing:1px;">2025 SEASON</span>
+      </div>
+
+      <!-- Lineup rows -->
+      {_lineup_html}
+    </div>
+
+    <!-- Footer stats -->
+    <div style="text-align:center;margin-top:1.5rem;margin-bottom:1rem;">
+      <span style="font-size:11px;color:#2a4a3a;">150 team-seasons analyzed across 5 years</span>
     </div>
     """, unsafe_allow_html=True)
 
