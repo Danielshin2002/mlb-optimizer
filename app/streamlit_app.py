@@ -67,6 +67,14 @@ from utils.constants import (
     STAGE_COLORS as STAGE_COLORS_CONST,
     STAGE_BG_COLORS,
 )
+from utils.player_utils import (
+    fix_player_name as _fix_player_name,
+    fix_player_col as _fix_player_col,
+    headshot_url as _headshot_url,
+    hover_img_tag as _hover_img_tag,
+)
+from utils.team_utils import cbt_info as _cbt_info, ordinal as _ordinal
+from utils.theme import plotly_theme as _pt
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -144,31 +152,6 @@ def _compute_cache_key(url: str) -> str:
 def _get_cached_file_path(url: str) -> str:
     """Return the disk path where a remote file should be cached."""
     return os.path.join(_CACHE_DIR, _compute_cache_key(url))
-
-
-def _fix_player_name(s: str) -> str:
-    """Normalise a player name: undo double-encoded UTF-8, then strip diacritics.
-
-    Handles mojibake like "JosÃ©" → "Jose" and clean accents like "Pérez" → "Perez".
-    Plain ASCII names pass through unchanged.
-    """
-    if not isinstance(s, str):
-        return s
-    # Step 1: undo double-encoded UTF-8 (latin-1 round-trip)
-    try:
-        s = s.encode("latin-1").decode("utf-8")
-    except (UnicodeDecodeError, UnicodeEncodeError):
-        pass
-    # Step 2: strip combining diacritical marks → ASCII equivalents
-    nfkd = _unicodedata.normalize("NFKD", s)
-    return "".join(c for c in nfkd if not _unicodedata.combining(c))
-
-
-def _fix_player_col(df: pd.DataFrame) -> pd.DataFrame:
-    """If a 'Player' column exists, normalise every name in place."""
-    if "Player" in df.columns:
-        df["Player"] = df["Player"].map(_fix_player_name)
-    return df
 
 
 def _read_csv(path: str, **kwargs) -> pd.DataFrame:
@@ -506,47 +489,6 @@ def _parse_payroll_val(val) -> float | None:
         return None
 
 
-# ---------------------------------------------------------------------------
-# Plotly theme helper
-# ---------------------------------------------------------------------------
-
-def _pt(**overrides) -> dict:
-    """Return a base Plotly layout dict — dark slate + deep blue theme.
-
-    Pass keyword overrides to customise per-chart (e.g. title, height, showlegend).
-    Nested dict overrides are shallow-merged with the base dicts.
-    """
-    base: dict = dict(
-        paper_bgcolor="#141d2e",   # match main bg
-        plot_bgcolor="#1c2a42",    # slightly lifted card surface
-        font=dict(color="#7a9ebc", size=11),
-        title=dict(font=dict(color="#d6e8f8", size=13), x=0.02),
-        xaxis=dict(
-            gridcolor="#1e3250", linecolor="#1e3250",
-            zerolinecolor="#253d58", zerolinewidth=1,
-            tickfont=dict(color="#7a9ebc"), title_font=dict(color="#a8c8e8"),
-        ),
-        yaxis=dict(
-            gridcolor="#1e3250", linecolor="#1e3250",
-            zerolinecolor="#253d58", zerolinewidth=1,
-            tickfont=dict(color="#7a9ebc"), title_font=dict(color="#a8c8e8"),
-        ),
-        legend=dict(
-            bgcolor="#1c2a42", bordercolor="#253d58", borderwidth=1,
-            font=dict(color="#7a9ebc"),
-        ),
-        margin=dict(l=50, r=20, t=45, b=50),
-        showlegend=False,
-        transition=dict(duration=400, easing="cubic-in-out"),
-    )
-    for k, v in overrides.items():
-        if isinstance(v, dict) and isinstance(base.get(k), dict):
-            base[k] = {**base[k], **v}
-        else:
-            base[k] = v
-    return base
-
-
 # Muted chart series palette — use these instead of saturated colors
 _CHART_PALETTE = [
     "#4873b8",  # muted blue
@@ -594,16 +536,6 @@ _CBT_TIERS: list[tuple[float, str, str, str, str]] = [
     (9999., "2nd Apron ≥$304M",        "#1f0808", "#fca5a5",
      "2nd Apron — hardest restrictions, draft pick penalty"),
 ]
-
-def _cbt_info(budget_m: float) -> tuple[str, str, str, float | None, str]:
-    """Return (label, bg, fg, next_threshold, apron_note) for a given budget."""
-    for i, (thresh, label, bg, fg, note) in enumerate(_CBT_TIERS):
-        if budget_m < thresh:
-            nxt = thresh if i > 0 else None
-            return label, bg, fg, nxt, note
-    t = _CBT_TIERS[-1]
-    return t[1], t[2], t[3], None, t[4]
-
 
 # ---------------------------------------------------------------------------
 # Shared glossary renderer
@@ -1203,27 +1135,6 @@ def _cached_mlbam_lookup(razzball_path: str) -> dict[str, str]:
                 key = _fix_player_name(name)
                 lookup.setdefault(key, mid)
     return lookup
-
-
-def _headshot_url(mlbam_id: str, width: int = 56) -> str:
-    """Return the MLB static headshot URL for a given MLBAM ID."""
-    return (
-        "https://img.mlbstatic.com/mlb-photos/image/upload/"
-        f"d_people:generic:headshot:67:current.png/w_{width},q_auto:best"
-        f"/v1/people/{mlbam_id}/headshot/67/current"
-    )
-
-
-def _hover_img_tag(player_name: str, mlbam_map: dict[str, str]) -> str:
-    """Return an <img> tag for the player's headshot, or empty string."""
-    mid = mlbam_map.get(player_name, "")
-    if not mid:
-        return ""
-    url = _headshot_url(mid, width=56)
-    return (
-        f"<img src='{url}' width='56' height='56' "
-        f"style='border-radius:50%;vertical-align:middle;margin-right:6px;'>"
-    )
 
 
 @st.cache_data(show_spinner=False)
@@ -8794,13 +8705,6 @@ _LOGO_FILE_NAMES: dict[str, str] = {
     "SFG": "San Francisco Giants", "STL": "St. Louis Cardinals", "TBR": "Tampa Bay Rays",
     "TEX": "Texas Rangers", "TOR": "Toronto Blue Jays", "WSN": "Washington Nationals",
 }
-
-
-def _ordinal(n: int) -> str:
-    """Return ordinal string: 1st, 2nd, 3rd, 4th, etc."""
-    if 11 <= n % 100 <= 13:
-        return f"{n}th"
-    return f"{n}{['th','st','nd','rd'][min(n % 10, 4) if n % 10 < 4 else 0]}"
 
 
 def _team_logo_url(abbr: str) -> str:
