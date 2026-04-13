@@ -2108,7 +2108,7 @@ def _render_player_comparison(players_df: pd.DataFrame):
         if any(v != "—" for v in vals):
             rows.append([label] + vals)
     comp_df = pd.DataFrame(rows, columns=header)
-    st.dataframe(comp_df, hide_index=True, use_container_width=True,
+    st.dataframe(comp_df, hide_index=True, width="stretch",
                  height=min(60 + len(comp_df) * 35, 520))
 
 
@@ -2230,7 +2230,7 @@ def _render_position_coverage(roster_df: pd.DataFrame):
     styled = cov_df[["Slot", "Need", "Have", "Status"]].style.applymap(
         _color_status, subset=["Status"]
     )
-    st.dataframe(styled, hide_index=True, use_container_width=True,
+    st.dataframe(styled, hide_index=True, width="stretch",
                  height=min(60 + len(cov_df) * 35, 490))
 
 
@@ -2412,7 +2412,7 @@ def _render_roster_summary(budget_M: float = 130.0):
                         height=450,
                         margin=dict(l=50, r=20, t=45, b=50),
                     ))
-                    st.plotly_chart(fig, use_container_width=True,
+                    st.plotly_chart(fig, width="stretch",
                                     config={"displayModeBar": False})
                 except Exception:
                     pass
@@ -2463,7 +2463,7 @@ def _render_roster_summary(budget_M: float = 130.0):
                         showlegend=True,
                         margin=dict(l=50, r=20, t=45, b=50),
                     ))
-                    st.plotly_chart(fig2, use_container_width=True,
+                    st.plotly_chart(fig2, width="stretch",
                                     config={"displayModeBar": False})
             except Exception:
                 pass
@@ -2785,13 +2785,13 @@ def _render_player_card(player_name: str, combined_path: str, file_hash: str):
                 ))
                 col_war, col_wpm = st.columns(2)
                 with col_war:
-                    st.plotly_chart(fig_war, use_container_width=True,
+                    st.plotly_chart(fig_war, width="stretch",
                                     config={"displayModeBar": False})
                 with col_wpm:
-                    st.plotly_chart(fig_wpm, use_container_width=True,
+                    st.plotly_chart(fig_wpm, width="stretch",
                                     config={"displayModeBar": False})
             else:
-                st.plotly_chart(fig_war, use_container_width=True,
+                st.plotly_chart(fig_war, width="stretch",
                                 config={"displayModeBar": False})
         except Exception:
             pass
@@ -4124,7 +4124,7 @@ def _render_simulator_page():
                             yaxis=dict(title="WAR", range=[0, _ymax]),
                             height=260, margin=dict(l=40, r=10, t=36, b=36),
                         ))
-                        st.plotly_chart(_fig1, use_container_width=True,
+                        st.plotly_chart(_fig1, width="stretch",
                                         config={"displayModeBar": False})
                 if "Salary_M" in roster_df.columns and "WAR_Total" in roster_df.columns:
                     _sc_df = roster_df.dropna(subset=["Salary_M", "WAR_Total"])
@@ -4159,7 +4159,7 @@ def _render_simulator_page():
                             height=260, showlegend=True,
                             margin=dict(l=40, r=10, t=36, b=36),
                         ))
-                        st.plotly_chart(_fig2, use_container_width=True,
+                        st.plotly_chart(_fig2, width="stretch",
                                         config={"displayModeBar": False})
                 # ── Fix 6 — Future Payroll Commitments ────────────────────
                 if n_rostered >= 5:
@@ -4223,14 +4223,14 @@ def _render_simulator_page():
                         barmode="stack", showlegend=True,
                         legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
                     ))
-                    st.plotly_chart(_fig_fut, use_container_width=True, config={"displayModeBar": False})
+                    st.plotly_chart(_fig_fut, width="stretch", config={"displayModeBar": False})
 
                     # Summary table
                     _fut_show = _fut_df[["Player", "Stage", "2026", "2027", "2028"]].copy()
                     _fut_show["2026"] = _fut_show["2026"].apply(lambda v: f"${v:.1f}M" if pd.notna(v) else "—")
                     _fut_show["2027"] = _fut_show["2027"].apply(lambda v: f"~${v:.1f}M" if pd.notna(v) else "Free Agent")
                     _fut_show["2028"] = _fut_show["2028"].apply(lambda v: f"~${v:.1f}M" if pd.notna(v) else "Free Agent")
-                    st.dataframe(_fut_show, hide_index=True, use_container_width=True,
+                    st.dataframe(_fut_show, hide_index=True, width="stretch",
                                  height=min(60 + n_rostered * 35, 400))
                     st.caption(
                         "2026 salaries reflect actual contracts. 2027–2028 figures for arbitration-eligible "
@@ -4489,7 +4489,7 @@ def _render_optimizer_page():
                     height=380,
                     margin=dict(l=50, r=20, t=45, b=110),
                 ))
-                st.plotly_chart(fig, use_container_width=True,
+                st.plotly_chart(fig, width="stretch",
                                 config={"displayModeBar": False})
             except Exception as e:
                 st.info(f"Chart unavailable: {e}")
@@ -4503,7 +4503,7 @@ def _render_optimizer_page():
             mix_df = pd.DataFrame(
                 [{"Archetype": k, "Slots": v} for k, v in opt_result.archetype_mix.items()]
             ).sort_values("Slots", ascending=False)
-            st.dataframe(mix_df, use_container_width=True)
+            st.dataframe(mix_df, width="stretch")
 
         st.markdown("---")
         st.subheader("Available Archetypes (gold inputs)")
@@ -4564,7 +4564,7 @@ def _render_optimizer_page():
                 height=380,
                 showlegend=False,
             ))
-            st.plotly_chart(fig, use_container_width=True,
+            st.plotly_chart(fig, width="stretch",
                             config={"displayModeBar": False})
         except Exception as e:
             st.info(f"Chart unavailable: {e}")
@@ -4626,7 +4626,7 @@ def _render_optimizer_page():
                     height=380,
                     margin=dict(l=50, r=20, t=45, b=50),
                 ))
-                st.plotly_chart(fig, use_container_width=True,
+                st.plotly_chart(fig, width="stretch",
                                 config={"displayModeBar": False})
             except Exception as e:
                 st.info(f"Chart unavailable: {e}")
@@ -5077,7 +5077,7 @@ def _render_payroll_charts(
                 height=300, showlegend=False,
                 margin=dict(l=10, r=10, t=40, b=10),
             ))
-            st.plotly_chart(fig_d, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_d, width="stretch", config={"displayModeBar": False})
         else:
             st.info("Depth chart not available — payroll chart skipped.")
 
@@ -5105,7 +5105,7 @@ def _render_payroll_charts(
                 height=300,
                 margin=dict(l=50, r=60, t=40, b=30),
             ))
-            st.plotly_chart(fig_w, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_w, width="stretch", config={"displayModeBar": False})
         else:
             st.info("Depth chart not available — WAR chart skipped.")
 
@@ -5136,7 +5136,7 @@ def _render_payroll_charts(
         height=200, showlegend=True,
         margin=dict(l=50, r=120, t=40, b=30),
     ))
-    st.plotly_chart(fig_b, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig_b, width="stretch", config={"displayModeBar": False})
 
 
 # ---------------------------------------------------------------------------
@@ -5434,7 +5434,7 @@ def _render_team_planner(base_cfg: dict | None = None):
                 })
                 if "Recommendation" in display.columns:
                     styled = styled.applymap(_color_rec, subset=["Recommendation"])
-                st.dataframe(styled, use_container_width=True)
+                st.dataframe(styled, width="stretch")
                 keep_count = (adf.get("recommendation", pd.Series()) == "Keep").sum()
                 st.caption(
                     f"Est. arb payroll if all retained: **${adf['proj_arb_cost_M'].sum():.1f}M** | "
@@ -5468,7 +5468,7 @@ def _render_team_planner(base_cfg: dict | None = None):
             with _oc1:
                 st.markdown(f"**{_open_slots} Open Slots to Fill**")
                 slot_df = pd.DataFrame([{"Slot": k, "Count": v} for k, v in sorted(remaining.items())])
-                st.dataframe(slot_df, use_container_width=True, hide_index=True)
+                st.dataframe(slot_df, width="stretch", hide_index=True)
             with _oc2:
                 st.markdown(
                     f"Budget remaining after committed payroll: **${_hero_avail:.1f}M**  \n"
@@ -5643,7 +5643,7 @@ def _render_team_planner(base_cfg: dict | None = None):
                     height=max(320, len(_cv) * 28),
                     margin=dict(l=160, r=280, t=45, b=40),
                 ))
-                st.plotly_chart(_fig_cur, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(_fig_cur, width="stretch", config={"displayModeBar": False})
 
                 _cv_tbl = _cur_val.sort_values("Total_WAR", ascending=False)[
                     ["Player","Seasons","Total_WAR","Peak_WAR","Total_Sal_M","Market_Val_M","Surplus_M"]
@@ -5692,7 +5692,7 @@ def _render_team_planner(base_cfg: dict | None = None):
                     height=max(320, len(_dv) * 28),
                     margin=dict(l=160, r=280, t=45, b=40),
                 ))
-                st.plotly_chart(_fig_dep, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(_fig_dep, width="stretch", config={"displayModeBar": False})
 
                 _dv_tbl = _dep_pos.head(20)[
                     ["Player","Seasons","Total_WAR","Peak_WAR","Total_Sal_M","Market_Val_M","Surplus_M"]
@@ -6377,7 +6377,7 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                 xaxis=dict(title="Age"), yaxis=dict(title=_traj_m),
                 height=640, showlegend=True,
             ))
-            st.plotly_chart(fig2, use_container_width=True)
+            st.plotly_chart(fig2, width="stretch")
 
             # ── Top 25 Standouts by age efficiency ──────────────────────
             st.markdown(
@@ -6447,7 +6447,7 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                 ))
                 fR1.update_layout(**_pt(title="Residuals vs Fitted",
                     xaxis=dict(title="Predicted Salary ($M)"), yaxis=dict(title="Residual ($M)"), height=400))
-                st.plotly_chart(fR1, use_container_width=True)
+                st.plotly_chart(fR1, width="stretch")
 
             with _r2:
                 fR2 = go.Figure(go.Histogram(
@@ -6457,7 +6457,7 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                 fR2.add_vline(x=0, line_color="#f4a261", line_dash="dash")
                 fR2.update_layout(**_pt(title="Residual Distribution",
                     xaxis=dict(title="Residual ($M)"), yaxis=dict(title="Count"), height=400))
-                st.plotly_chart(fR2, use_container_width=True)
+                st.plotly_chart(fR2, width="stretch")
 
             fR3 = go.Figure()
             fR3.add_hline(y=0, line_color="#94a3b8", line_dash="dash", opacity=0.5)
@@ -6474,7 +6474,7 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                                          line=dict(color="#ef4444", width=2), name="LOESS trend"))
             fR3.update_layout(**_pt(title="Residuals vs WAR",
                 xaxis=dict(title="WAR"), yaxis=dict(title="Residual ($M)"), height=440, showlegend=True))
-            st.plotly_chart(fR3, use_container_width=True)
+            st.plotly_chart(fR3, width="stretch")
 
         # ── Tab 2 — PPEL (Pay-Performance Efficiency Line) ───────────────
         with t2:
@@ -6543,7 +6543,7 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                     hoverlabel=dict(bgcolor="#0d1f38", bordercolor="#1e3a5f",
                                     font=dict(color="#dbeafe", size=12), namelength=-1),
                 ))
-                st.plotly_chart(fig_cel, use_container_width=True)
+                st.plotly_chart(fig_cel, width="stretch")
 
                 # Ranked bar below
                 _pvp_ranked = (
@@ -6567,7 +6567,7 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                     xaxis=dict(title="PVP"), yaxis=dict(autorange="reversed"),
                     height=max(350, _pv_n * 22), margin=dict(l=230, r=60, t=40, b=40),
                 ))
-                st.plotly_chart(fig_bar1, use_container_width=True)
+                st.plotly_chart(fig_bar1, width="stretch")
                 _league_pvp = df["WAR_Total"].sum() / df["Salary_M"].sum()
                 st.caption(f"League-average PVP (filtered data): **{_league_pvp:.3f}** WAR per $M")
 
@@ -6662,7 +6662,7 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                         hoverlabel=dict(bgcolor="#0d1f38", bordercolor="#1e3a5f",
                                         font=dict(color="#dbeafe", size=12), namelength=-1),
                     ))
-                    st.plotly_chart(fig_p3, use_container_width=True)
+                    st.plotly_chart(fig_p3, width="stretch")
 
                     _p3_ranked = (
                         _p3.nlargest(_pv_n, "PVP3") if _pv_sort.startswith("Best")
@@ -6689,7 +6689,7 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                         xaxis=dict(title="PVP3"), yaxis=dict(autorange="reversed"),
                         height=max(350, _pv_n * 22), margin=dict(l=230, r=60, t=40, b=40),
                     ))
-                    st.plotly_chart(fig_bar3, use_container_width=True)
+                    st.plotly_chart(fig_bar3, width="stretch")
                     _lg_pvp3 = _p3["WAR3"].sum() / _p3["Sal3"].sum()
                     st.caption(
                         f"Seasons used: **{', '.join(str(y) for y in _last3)}** "
@@ -6786,7 +6786,7 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                         hoverlabel=dict(bgcolor="#18243a", bordercolor="#253d58",
                                         font=dict(color="#d6e8f8", size=12), namelength=-1),
                     ))
-                    st.plotly_chart(fig_p5, use_container_width=True)
+                    st.plotly_chart(fig_p5, width="stretch")
 
                     _p5_ranked = (
                         _p5.nlargest(_pv_n, "PVP5") if _pv_sort.startswith("Best")
@@ -6813,7 +6813,7 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                         xaxis=dict(title="PPEL5"), yaxis=dict(autorange="reversed"),
                         height=max(350, _pv_n * 22), margin=dict(l=230, r=60, t=40, b=40),
                     ))
-                    st.plotly_chart(fig_bar5, use_container_width=True)
+                    st.plotly_chart(fig_bar5, width="stretch")
                     _lg_pvp5 = _p5["WAR5"].sum() / _p5["Sal5"].sum()
                     st.caption(
                         f"Seasons used: **{', '.join(str(y) for y in _last5)}** "
@@ -6970,7 +6970,7 @@ display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
                     height=580, showlegend=True,
                     legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="right", x=1),
                 ))
-                st.plotly_chart(fig_pa, use_container_width=True)
+                st.plotly_chart(fig_pa, width="stretch")
                 if st.button("↺  Reset Legend Filter", key="ef_pa_reset_legend"):
                     st.rerun()
 
@@ -7104,7 +7104,7 @@ display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
                     hoverlabel=dict(bgcolor="#0d1f38", bordercolor="#1e3a5f",
                                     font=dict(color="#dbeafe", size=12)),
                 ))
-                st.plotly_chart(fig_wsr, use_container_width=True)
+                st.plotly_chart(fig_wsr, width="stretch")
             else:
                 st.info("No players meet the minimum qualifying threshold.")
 
@@ -7214,7 +7214,7 @@ if False:  # noqa: dead code preserved for reference
             "teams below are underperforming relative to their spend. "
             "Star = WS champion, diamond = WS runner-up. Faded = missed playoffs."
         )
-        st.image(_r2_image(scatter_path), use_container_width=True)
+        st.image(_r2_image(scatter_path), width="stretch")
     else:
         st.info("efficiency_scatter.png not found -- click Regenerate Analysis.")
 
@@ -7255,17 +7255,17 @@ if False:  # noqa: dead code preserved for reference
                     height=max(420, len(_rdf) * 17),
                     margin=dict(l=60, r=80, t=45, b=50),
                 ))
-                st.plotly_chart(_fig_rank, use_container_width=True,
+                st.plotly_chart(_fig_rank, width="stretch",
                                 config={"displayModeBar": False})
             else:
-                st.image(_r2_image(ranking_path), use_container_width=True)
+                st.image(_r2_image(ranking_path), width="stretch")
         except Exception:
             if _R2_MODE or os.path.exists(ranking_path):
-                st.image(_r2_image(ranking_path), use_container_width=True)
+                st.image(_r2_image(ranking_path), width="stretch")
             else:
                 st.info("efficiency_ranking.png not found — click Regenerate Analysis.")
     elif _R2_MODE or os.path.exists(ranking_path):
-        st.image(_r2_image(ranking_path), use_container_width=True)
+        st.image(_r2_image(ranking_path), width="stretch")
     else:
         st.info("efficiency_ranking.png not found — click Regenerate Analysis.")
 
@@ -7277,7 +7277,7 @@ if False:  # noqa: dead code preserved for reference
             "Top row = 5 most efficient teams (spending least above frontier). "
             "Bottom row = 5 most inefficient. Each bar = average WAR from that position group."
         )
-        st.image(_r2_image(position_path), use_container_width=True)
+        st.image(_r2_image(position_path), width="stretch")
     else:
         st.info("position_breakdown.png not found -- click Regenerate Analysis.")
 
@@ -7367,7 +7367,7 @@ if False:  # noqa: dead code preserved for reference
                     height=540,
                     showlegend=True,
                 ))
-                st.plotly_chart(_fig_q3, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(_fig_q3, width="stretch", config={"displayModeBar": False})
         except Exception:
             pass  # silently skip if ranking CSV unavailable
 
@@ -7438,7 +7438,7 @@ if False:  # noqa: dead code preserved for reference
                 "$vsLine ($M)":      "${:+.0f}M",
             }, na_rep="-")
         )
-        st.dataframe(styled, use_container_width=True, height=600)
+        st.dataframe(styled, width="stretch", height=600)
 
         dl1, dl2 = st.columns(2)
         with dl1:
@@ -7577,7 +7577,7 @@ if False:  # noqa: dead code preserved for reference
                                 margin=dict(l=50, r=20, t=45, b=50),
                             ))
                             with col:
-                                st.plotly_chart(fig, use_container_width=True,
+                                st.plotly_chart(fig, width="stretch",
                                                 config={"displayModeBar": False})
                     except Exception as _e:
                         st.info(f"PPR correlation chart unavailable: {_e}")
@@ -7681,7 +7681,7 @@ if False:  # noqa: dead code preserved for reference
                         height=500,
                         margin=dict(l=160, r=120, t=45, b=40),
                     ))
-                    st.plotly_chart(_fig_pa, use_container_width=True,
+                    st.plotly_chart(_fig_pa, width="stretch",
                                     config={"displayModeBar": False})
 
                 with _pa_col2:
@@ -7755,7 +7755,7 @@ if False:  # noqa: dead code preserved for reference
                         yaxis=dict(title="Peak Single-Season WAR"),
                         height=500,
                     ))
-                    st.plotly_chart(_fig_sc, use_container_width=True,
+                    st.plotly_chart(_fig_sc, width="stretch",
                                     config={"displayModeBar": False})
 
                 # Top pre-arb value table
@@ -8368,7 +8368,7 @@ def _render_rankings_page():
             })
             _pr_show["Salary $M"] = _pr_show["Salary $M"].round(1)
             _pr_show["fWAR"] = _pr_show["fWAR"].round(1)
-            st.dataframe(_pr_show, hide_index=True, use_container_width=True, height=500)
+            st.dataframe(_pr_show, hide_index=True, width="stretch", height=500)
         else:
             st.info(f"No player data available for {sel_year}.")
     except Exception as _pr_e:
@@ -8451,7 +8451,7 @@ def _render_rankings_page():
             ))
             _f1_col, _ = st.columns([3, 1])
             with _f1_col:
-                st.plotly_chart(fig_f1, use_container_width=True)
+                st.plotly_chart(fig_f1, width="stretch")
 
         # 1B — Efficiency vs Postseason table
         if {"dollar_gap_M", "in_playoffs", "ws_champ"}.issubset(detail_df.columns):
@@ -8590,7 +8590,7 @@ def _render_rankings_page():
         ))
         _f2_col, _ = st.columns([3, 1])
         with _f2_col:
-            st.plotly_chart(fig_f2, use_container_width=True)
+            st.plotly_chart(fig_f2, width="stretch")
 
         # 2B — Interactive slider
         _spend_add = st.slider("Add spending ($M)", 0, 50, 10, step=5,
@@ -8700,7 +8700,7 @@ def _render_rankings_page():
                 ))
                 _rss_col, _ = st.columns([3, 1])
                 with _rss_col:
-                    st.plotly_chart(fig_rss, use_container_width=True)
+                    st.plotly_chart(fig_rss, width="stretch")
 
                 # Auto insight
                 _med_rss = float(_rss_df["RSS"].median())
@@ -8956,7 +8956,7 @@ def _render_team_analysis_page():
 
     # Inject CSS to hide team picker button chrome
     st.markdown("""<style>
-    /* Team picker — buttons hidden behind logo overlay */
+    /* Team picker — pure HTML, no buttons */
     </style>""", unsafe_allow_html=True)
 
     def _render_league_grid(league_name, divs):
@@ -8971,38 +8971,36 @@ def _render_team_analysis_page():
                 f"margin:0.2rem 0 0.1rem;'>{div_name}</div>",
                 unsafe_allow_html=True,
             )
-            tcols = st.columns(5)
-            for ti, tm in enumerate(teams):
+            # All 5 logos as pure HTML clickable cards — NO st.button
+            _cards = ""
+            for tm in teams:
                 _url = _team_logo_url(tm)
                 is_active = tm == sel_team
                 _bdr = "2px solid #3b82f6" if is_active else "1px solid transparent"
                 _bg = "rgba(59,130,246,0.1)" if is_active else "transparent"
                 _shadow = "box-shadow:0 0 12px #3b82f644;" if is_active else ""
                 _name = _ABBR_TO_FULL.get(tm, tm)
-                with tcols[ti]:
-                    # Button first — clickable area
-                    if st.button(tm, key=f"tpick_{tm}", use_container_width=True):
-                        st.session_state["team_analysis_sel"] = tm
-                        st.rerun()
-                    # Logo overlay on top of button
-                    st.markdown(
-                        f"<div class='tpick-logo-card' style='margin-top:-2.8rem;pointer-events:none;position:relative;z-index:1;"
-                        f"background:{_bg};border:{_bdr};border-radius:8px;"
-                        f"padding:6px 4px 4px;text-align:center;{_shadow}'>"
-                        f"<img src='{_url}' width='55' height='55' style='object-fit:contain;'>"
-                        f"<div style='font-size:0.75rem;font-weight:700;color:#e8f4ff;margin-top:3px;'>{_name}</div>"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
+                _cards += (
+                    f"<a href='?page=team&sel_team={tm}' target='_self' style='text-decoration:none;'>"
+                    f"<div class='tpick-logo-card' style='background:{_bg};border:{_bdr};border-radius:8px;"
+                    f"padding:6px 4px 4px;text-align:center;{_shadow}cursor:pointer;'>"
+                    f"<img src='{_url}' width='55' height='55' style='object-fit:contain;'>"
+                    f"<div style='font-size:0.75rem;font-weight:700;color:#e8f4ff;margin-top:3px;'>{_name}</div>"
+                    f"</div></a>"
+                )
+            st.markdown(
+                f"<div style='display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:6px;'>"
+                f"{_cards}</div>",
+                unsafe_allow_html=True,
+            )
 
-    st.markdown("<div class='tpick-zone'>", unsafe_allow_html=True)
+    # Team picker grid (pure HTML, no st.button)
     al_col, nl_col = st.columns(2, gap="medium")
     with al_col:
         _render_league_grid("American League", _AL_DIVS)
     with nl_col:
         _render_league_grid("National League", _NL_DIVS)
 
-    st.markdown("</div>", unsafe_allow_html=True)  # close tpick-zone
     # Spacer between team picker and content
     st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
 
@@ -9416,7 +9414,7 @@ def _render_team_analysis_page():
                 height=max(400, len(_rk) * 22),
                 margin=dict(l=60, r=80, t=42, b=30),
             ))
-            st.plotly_chart(fig_rk, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_rk, width="stretch", config={"displayModeBar": False})
 
             # fWAR ranking bar
             _wrk = all_eff_2025.sort_values("team_WAR", ascending=False).reset_index(drop=True)
@@ -9437,7 +9435,7 @@ def _render_team_analysis_page():
                 height=max(400, len(_wrk) * 22),
                 margin=dict(l=60, r=80, t=42, b=30),
             ))
-            st.plotly_chart(fig_wrk, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_wrk, width="stretch", config={"displayModeBar": False})
         else:
             st.info("No efficiency ranking data available.")
 
@@ -9472,7 +9470,7 @@ def _render_team_analysis_page():
                 title=f"{_sal_year} Payroll by Contract Stage",
                 height=360, showlegend=False,
             ))
-            st.plotly_chart(fig_stg, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_stg, width="stretch", config={"displayModeBar": False})
 
             # Top 10 highest paid
             _top_sal = team_data.nlargest(10, _sal_col)[["full_name", "position_primary", _sal_col, "contract_stage"]].copy()
@@ -9510,7 +9508,7 @@ def _render_team_analysis_page():
                 title=f"{_full_name} — Committed Payroll (2026–2032)",
                 yaxis=dict(title="Total $M"), height=380,
             ))
-            st.plotly_chart(fig_proj, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_proj, width="stretch", config={"displayModeBar": False})
 
             st.caption(
                 "2026 salaries reflect actual contracts and league minimum estimates. "
@@ -9604,7 +9602,7 @@ def _render_team_analysis_page():
                     hoverlabel=dict(bgcolor="#0d1f38", bordercolor="#1e3a5f",
                                     font=dict(color="#dbeafe", size=12)),
                 ))
-                st.plotly_chart(fig_eff, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig_eff, width="stretch", config={"displayModeBar": False})
 
                 # Top value / worst value mini-tables
                 _vc1, _vc2 = st.columns(2)
@@ -9661,7 +9659,7 @@ def _render_team_analysis_page():
                 height=380, showlegend=True,
                 legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
             ))
-            st.plotly_chart(fig_hist, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_hist, width="stretch", config={"displayModeBar": False})
 
             # Surplus / Lost Value trend (inverted: negative gap = surplus shown as negative/green)
             _gap_vals = _te["dollar_gap_M"].values
@@ -9687,7 +9685,7 @@ def _render_team_analysis_page():
                 "Positive (orange) = lost value (underperforming relative to spend).</div>",
                 unsafe_allow_html=True,
             )
-            st.plotly_chart(fig_gap, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_gap, width="stretch", config={"displayModeBar": False})
 
             # Payroll + fWAR trend
             fig_pw = go.Figure()
@@ -9712,7 +9710,7 @@ def _render_team_analysis_page():
                 height=380, showlegend=True,
                 legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
             ))
-            st.plotly_chart(fig_pw, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_pw, width="stretch", config={"displayModeBar": False})
 
             # Summary table
             st.markdown("##### Season-by-Season Summary")
@@ -9772,7 +9770,7 @@ def _render_team_analysis_page():
                         yaxis=dict(title="% of Total fWAR", range=[0, 100]),
                         height=340,
                     ))
-                    st.plotly_chart(fig_conc, use_container_width=True, config={"displayModeBar": False})
+                    st.plotly_chart(fig_conc, width="stretch", config={"displayModeBar": False})
             except Exception:
                 pass
 
