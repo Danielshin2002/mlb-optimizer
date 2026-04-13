@@ -7795,6 +7795,13 @@ if False:  # noqa: dead code preserved for reference
 def _render_rankings_page():
     """League Rankings — WAR, Salary, and Efficiency ranked by team."""
 
+    # ── Query-param driven box selection ──────────────────────────────────────
+    _qp_box = st.query_params.get("rk_box")
+    _qp_yr  = st.query_params.get("rk_year")
+    if _qp_box:
+        st.session_state["rk_selected_box"] = _qp_box
+        st.session_state["rk_box_clicked"] = True
+
     # ── CSS ──────────────────────────────────────────────────────────────────
     st.markdown("""<style>
 .rk-hdr{background:linear-gradient(135deg,#18243a 0%,#111927 100%);
@@ -7803,12 +7810,20 @@ def _render_rankings_page():
 .rk-hdr .rk-sub{font-size:0.72rem;color:#7a9ebc;margin-top:0.15rem;}
 .rk-answer{background:#1c2a42;border:1px solid #1e3250;border-radius:10px;
   padding:0.8rem 1rem;text-align:center;min-height:120px;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:border-color 0.2s,box-shadow 0.2s;}
+.rk-answer:hover{border-color:#f59e0b;box-shadow:0 0 10px rgba(245,158,11,0.25);}
 .rk-answer .rk-q{font-size:0.72rem;color:#93b8d8;
   letter-spacing:0.05em;margin-bottom:0.2rem;font-weight:600;}
 .rk-answer .rk-team{font-size:1.25rem;font-weight:800;color:#d6e8f8;line-height:1.1;}
 .rk-answer .rk-val{font-size:0.82rem;color:#93b8d8;margin-top:0.2rem;}
 .rk-answer .rk-icon{font-size:1.3rem;margin-bottom:0.15rem;line-height:1;}
+.rk-box-sel{border-color:#f59e0b !important;box-shadow:0 0 12px rgba(245,158,11,0.3) !important;}
+.rk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.7rem;margin-bottom:0.7rem;}
+.rk-grid a{text-decoration:none;color:inherit;}
+@keyframes gentle-pulse{0%,100%{opacity:0.4;}50%{opacity:1;}}
+.rk-hint{text-align:center;color:#4a687e;font-size:0.82rem;margin:0.6rem 0;
+  animation:gentle-pulse 2.5s ease-in-out infinite;}
 </style>""", unsafe_allow_html=True)
 
     # ── Load data ─────────────────────────────────────────────────────────────
@@ -7841,11 +7856,18 @@ def _render_rankings_page():
         unsafe_allow_html=True,
     )
 
-    # ── Year selector ─────────────────────────────────────────────────────────
+    # ── Year selector (right) + instruction (left) ───────────────────────────
     years_avail = sorted(detail_df["Year"].dropna().unique().astype(int), reverse=True)
-    yr_col, _ = st.columns([2, 8])
-    with yr_col:
-        sel_year = st.selectbox("Season", years_avail, key="rk_year", index=0)
+    _hint_col, _, _yr_col = st.columns([5, 3, 2])
+    with _hint_col:
+        st.markdown(
+            "<div style='padding-top:0.45rem;font-size:0.88rem;color:#7a9ebc;'>"
+            "Click a box to get started</div>",
+            unsafe_allow_html=True,
+        )
+    with _yr_col:
+        _yr_default = years_avail.index(int(_qp_yr)) if _qp_yr and int(_qp_yr) in years_avail else 0
+        sel_year = st.selectbox("Season", years_avail, key="rk_year_sel", index=_yr_default)
 
     yr_df = detail_df[detail_df["Year"] == sel_year].copy()
     if yr_df.empty:
@@ -7887,28 +7909,6 @@ def _render_rankings_page():
          "Average team fWAR is ~34; playoff teams typically need 27+; World Series champions average 42+."),
     ], title="📖 Terms & Definitions")
 
-    # ── Quick-answer highlight cards ─────────────────────────────────────────
-    def _qa(icon, question, team, value_str, bdr="#1e3250", tooltip="", team_abbr=""):
-        _logo = ""
-        _link_open = ""
-        _link_close = ""
-        if team_abbr:
-            _logo_u = _team_logo_url(team_abbr)
-            _logo = (f"<img src='{_logo_u}' width='36' height='36' style='object-fit:contain;"
-                     f"margin-bottom:4px;' onerror=\"this.style.display='none'\">")
-            _link_open = f"<a href='?page=team&sel_team={team_abbr}' target='_self' style='text-decoration:none;color:inherit;'>"
-            _link_close = "</a>"
-        return (
-            f"{_link_open}"
-            f"<div class='rk-answer' style='border-color:{bdr};cursor:pointer;'>"
-            f"{_logo}"
-            f"<div class='rk-q'>{question}</div>"
-            f"<div class='rk-team'>{team}</div>"
-            f"<div class='rk-val'>{value_str}</div>"
-            f"</div>"
-            f"{_link_close}"
-        )
-
     _best_eff  = yr_df.loc[yr_df["dollar_gap_M"].idxmin()]
     _worst_eff = yr_df.loc[yr_df["dollar_gap_M"].idxmax()]
     _top_war   = yr_df.loc[yr_df["team_WAR"].idxmax()]
@@ -7923,11 +7923,20 @@ def _render_rankings_page():
     # ── Clickable highlight boxes → control which tab shows below ───────────
     # Box → tab mapping
     _BOX_TAB = {
-        "most_efficient": "efficiency", "top_overperformer": "winperf",
-        "best_dpw": "salary", "least_efficient": "efficiency",
-        "top_fwar": "fwar", "most_wins": "winperf",
-        "p_top_fwar": "fwar", "p_contract_val": "salary", "p_stability": "fwar",
+        "most_efficient": "efficiency", "least_efficient": "efficiency",
+        "top_overperformer": "winperf", "most_wins": "winperf",
+        "best_dpw": "salary",
+        "top_fwar": "fwar",
+        "p_top_fwar": "player_rankings",
+        "p_contract_val": "contract_value",
+        "p_stability": "stability",
+        "best_marginal": "marginal",
+        "top_rss": "rss",
+        "fwar_wins_link": "fwar",
     }
+    _TAB_ORDER = [
+        "efficiency", "fwar", "salary", "winperf", "contract_value", "stability",
+    ]
     if "rk_active_tab" not in st.session_state:
         st.session_state["rk_active_tab"] = "efficiency"
     if "rk_selected_box" not in st.session_state:
@@ -7935,59 +7944,21 @@ def _render_rankings_page():
     if "rk_box_clicked" not in st.session_state:
         st.session_state["rk_box_clicked"] = False
 
+    # Apply query-param box → active tab
+    if _qp_box and _qp_box in _BOX_TAB:
+        st.session_state["rk_active_tab"] = _BOX_TAB[_qp_box]
+
     _sel_box = st.session_state["rk_selected_box"]
     _act_tab = st.session_state["rk_active_tab"]
 
-    # CSS for clickable boxes + highlight
-    st.markdown("""<style>
-    .rk-box-sel { border-color:#f59e0b !important; box-shadow:0 0 12px rgba(245,158,11,0.3) !important; }
-    .rk-answer { cursor:pointer; transition:border-color 0.2s,box-shadow 0.2s; }
-    @keyframes gentle-pulse { 0%,100%{opacity:0.4;} 50%{opacity:1;} }
-    .rk-hint { text-align:center; color:#4a687e; font-size:0.82rem; margin:0.6rem 0;
-               animation: gentle-pulse 2.5s ease-in-out infinite; }
-    </style>""", unsafe_allow_html=True)
-
-    # Render boxes as st.button grid
-    _box_defs = [
-        ("most_efficient", "🏆", "MOST EFFICIENT", _full(_best_eff),
-         f"${_best_eff['dollar_gap_M']:.0f}M below the line", _best_eff["Team"]),
-        ("top_overperformer", "📈", "TOP OVERPERFORMER", _full(_overperf),
-         f"+{_overperf['wins_vs_pred']:.1f} wins vs forecast", _overperf["Team"]),
-        ("best_dpw", "💰", "BEST $/fWAR", _full(_best_dpw),
-         f"${_best_dpw['DPW']:.1f}M per fWAR", _best_dpw["Team"]),
-        ("least_efficient", "🔴", "LEAST EFFICIENT", _full(_worst_eff),
-         f"${_worst_eff['dollar_gap_M']:.0f}M above the line", _worst_eff["Team"]),
-        ("top_fwar", "⭐", "TOP fWAR", _full(_top_war),
-         f"{_top_war['team_WAR']:.1f} total fWAR", _top_war["Team"]),
-        ("most_wins", "🏅", "MOST WINS", _full(_top_wins),
-         f"{int(_top_wins['Wins'])} wins", _top_wins["Team"]),
-    ]
-
-    for row_start in range(0, 6, 3):
-        cols = st.columns(3)
-        for ci in range(3):
-            bi = row_start + ci
-            box_id, icon, label, team_name, val_str, team_abbr = _box_defs[bi]
-            is_sel = box_id == _sel_box
-            with cols[ci]:
-                _logo_u = _team_logo_url(team_abbr)
-                _sel_cls = "rk-box-sel" if is_sel else ""
-                st.markdown(
-                    f"<div class='rk-answer {_sel_cls}'>"
-                    f"<img src='{_logo_u}' width='36' height='36' style='object-fit:contain;margin-bottom:4px;' onerror=\"this.style.display='none'\">"
-                    f"<div class='rk-q'>{label}</div>"
-                    f"<div class='rk-team'>{team_name}</div>"
-                    f"<div class='rk-val'>{val_str}</div></div>",
-                    unsafe_allow_html=True,
-                )
-                if st.button("Select ↓", key=f"rk_box_{box_id}", use_container_width=True,
-                             type="primary" if is_sel else "secondary"):
-                    st.session_state["rk_selected_box"] = box_id
-                    st.session_state["rk_active_tab"] = _BOX_TAB[box_id]
-                    st.session_state["rk_box_clicked"] = True
-                    st.rerun()
-
-    # ── Player award boxes (top fWAR, best contract value, best stability) ──
+    # ── Load player data for boxes & new tabs ─────────────────────────────────
+    _paw_df = None
+    _paw_25 = pd.DataFrame()
+    _wsr_grp = pd.DataFrame()
+    _p_top_war = None
+    _p_best_val = None
+    _p_best_wsr = None
+    _mlbam = {}
     try:
         _paw_csv = _data_url("data/mlb_combined_2021_2025.csv")
         _paw_df = _read_csv(_paw_csv, low_memory=False)
@@ -8016,83 +7987,179 @@ def _render_rankings_page():
         _wsr_grp["WSR"] = (_wsr_grp["_mean"] / (1 + _wsr_grp["_std"])).round(2)
         _p_best_wsr = _wsr_grp.sort_values("WSR", ascending=False).iloc[0] if not _wsr_grp.empty else None
 
-        # MLBAM lookup for headshots
         _mlbam = _cached_mlbam_lookup(_RAZZBALL_PATH)
-
-        def _player_card(title, player_name, team, value_line, sub_line=""):
-            mid = _mlbam.get(_fix_player_name(player_name), "")
-            if mid:
-                img_url = _headshot_url(mid, width=120)
-                img_html = f"<img src='{img_url}' width='60' height='60' style='border-radius:50%;object-fit:cover;margin-bottom:4px;' onerror=\"this.style.display='none'\">"
-            else:
-                img_html = ""
-            return (
-                f"<div class='rk-answer' style='border-color:#1e3a5c;'>"
-                f"<div class='rk-q'>{title}</div>"
-                f"{img_html}"
-                f"<div class='rk-team'>{player_name}</div>"
-                f"<div style='font-size:0.75rem;color:#93b8d8;margin-top:1px;'>{team}</div>"
-                f"<div class='rk-val'>{value_line}</div>"
-                + (f"<div style='font-size:0.62rem;color:#4a687e;'>{sub_line}</div>" if sub_line else "")
-                + "</div>"
-            )
-
-        _p_box_defs = []
-        if _p_top_war is not None:
-            _p_box_defs.append(("p_top_fwar", f"#1 fWAR ({sel_year})", str(_p_top_war["Player"]),
-                                str(_p_top_war["Team"]), f"{_p_top_war['WAR_Total']:.1f} fWAR", ""))
-        if _p_best_val is not None:
-            _p_box_defs.append(("p_contract_val", "TOP CONTRACT VALUE", str(_p_best_val["Player"]),
-                                str(_p_best_val["Team"]), f"{_p_best_val['_wpm']:.2f} fWAR/$M",
-                                f"{_p_best_val['WAR_Total']:.1f} fWAR · ${_p_best_val['Salary_M']:.1f}M"))
-        if _p_best_wsr is not None:
-            _p_box_defs.append(("p_stability", "BEST fWAR STABILITY", str(_p_best_wsr["Player"]),
-                                str(_p_best_wsr["Team"]), f"{_p_best_wsr['WSR']:.2f} WSR",
-                                f"Avg {_p_best_wsr['_mean']:.1f} fWAR · {int(_p_best_wsr['_n'])} seasons"))
-
-        if _p_box_defs:
-            pcols = st.columns(len(_p_box_defs))
-            for pi, (box_id, title, pname, pteam, pval, psub) in enumerate(_p_box_defs):
-                is_sel = box_id == _sel_box
-                _sel_cls = "rk-box-sel" if is_sel else ""
-                mid = _mlbam.get(_fix_player_name(pname), "")
-                img_html = (f"<img src='{_headshot_url(mid, 120)}' width='60' height='60' "
-                            f"style='border-radius:50%;object-fit:cover;margin-bottom:4px;' "
-                            f"onerror=\"this.style.display='none'\">") if mid else ""
-                with pcols[pi]:
-                    st.markdown(
-                        f"<div class='rk-answer {_sel_cls}'>"
-                        f"<div class='rk-q'>{title}</div>{img_html}"
-                        f"<div class='rk-team'>{pname}</div>"
-                        f"<div style='font-size:0.75rem;color:#93b8d8;'>{pteam}</div>"
-                        f"<div class='rk-val'>{pval}</div>"
-                        + (f"<div style='font-size:0.62rem;color:#4a687e;'>{psub}</div>" if psub else "")
-                        + "</div>",
-                        unsafe_allow_html=True,
-                    )
-                    if st.button("Select ↓", key=f"rk_box_{box_id}", use_container_width=True,
-                                 type="primary" if is_sel else "secondary"):
-                        st.session_state["rk_selected_box"] = box_id
-                        st.session_state["rk_active_tab"] = _BOX_TAB[box_id]
-                        st.session_state["rk_box_clicked"] = True
-                        st.rerun()
     except Exception:
         pass
 
+    # ── Compute row-4 box values ──────────────────────────────────────────────
+    # Best Marginal Spending — tier with highest slope
+    _best_marginal_name = "N/A"
+    _best_marginal_val = ""
+    if {"payroll_M", "Wins"}.issubset(detail_df.columns):
+        _f2_pre = detail_df.dropna(subset=["payroll_M", "Wins"]).copy()
+        _f2_pre["payroll_M"] = pd.to_numeric(_f2_pre["payroll_M"], errors="coerce")
+        _f2_pre["Wins"] = pd.to_numeric(_f2_pre["Wins"], errors="coerce")
+        _TIERS_PRE = [
+            ("Budget ($0-100M)", 0, 100), ("Mid-Market ($100-175M)", 100, 175),
+            ("Contender ($175-244M)", 175, 244), ("Big Market ($244M+)", 244, 999),
+        ]
+        _best_slope = -999
+        for _tn, _tlo, _thi in _TIERS_PRE:
+            _tdf = _f2_pre[(_f2_pre["payroll_M"] >= _tlo) & (_f2_pre["payroll_M"] < _thi)]
+            if len(_tdf) >= 5:
+                _tc = np.polyfit(_tdf["payroll_M"], _tdf["Wins"], 1)
+                _tw10 = _tc[0] * 10
+                if _tw10 > _best_slope:
+                    _best_slope = _tw10
+                    _best_marginal_name = _tn
+                    _best_marginal_val = f"+{_tw10:.2f} wins/$10M"
+
+    # Top Roster Stability — best RSS team for the selected year
+    _top_rss_team = "N/A"
+    _top_rss_val = ""
+    _rss_records_box = []
+    try:
+        if _paw_df is not None:
+            _comb_box = _paw_df.copy()
+            for _nc in ["PA", "IP"]:
+                if _nc in _comb_box.columns:
+                    _comb_box[_nc] = pd.to_numeric(_comb_box[_nc], errors="coerce")
+            _is_pit_box = _comb_box["Position"].isin(["SP", "RP", "P", "TWP"])
+            _comb_q_box = _comb_box[
+                (_is_pit_box & (_comb_box["IP"].fillna(0) >= 150)) |
+                (~_is_pit_box & (_comb_box["PA"].fillna(0) >= 150))
+            ].copy()
+            _yrs_box = sorted(_comb_q_box["Year"].dropna().unique().astype(int))
+            if sel_year in _yrs_box and sel_year > min(_yrs_box):
+                for _tm in _comb_q_box["Team"].unique():
+                    _curr = set(_comb_q_box[(_comb_q_box["Year"] == sel_year) & (_comb_q_box["Team"] == _tm)]["Player"])
+                    _prev = set(_comb_q_box[(_comb_q_box["Year"] == sel_year - 1) & (_comb_q_box["Team"] == _tm)]["Player"])
+                    if _curr:
+                        _rss_val = len(_curr & _prev) / len(_curr) * 100
+                        _rss_records_box.append({"Team": _tm, "RSS": round(_rss_val, 1)})
+            if _rss_records_box:
+                _rss_box_df = pd.DataFrame(_rss_records_box).sort_values("RSS", ascending=False)
+                _top_rss_row = _rss_box_df.iloc[0]
+                _top_rss_team = str(_top_rss_row["Team"])
+                _top_rss_val = f"{_top_rss_row['RSS']:.1f}% returning"
+    except Exception:
+        pass
+
+    # Strongest fWAR-Wins Link — R² value
+    _fwar_r2_str = ""
+    _fwar_r2 = 0.0
+    if "team_WAR" in detail_df.columns and "Wins" in detail_df.columns:
+        _f1_pre = detail_df.dropna(subset=["team_WAR", "Wins"]).copy()
+        _f1_pre["team_WAR"] = pd.to_numeric(_f1_pre["team_WAR"], errors="coerce")
+        _f1_pre["Wins"] = pd.to_numeric(_f1_pre["Wins"], errors="coerce")
+        _f1_pre = _f1_pre.dropna(subset=["team_WAR", "Wins"])
+        if len(_f1_pre) > 5:
+            _xp = _f1_pre["team_WAR"].values
+            _yp = _f1_pre["Wins"].values
+            _cp = np.polyfit(_xp, _yp, 1)
+            _pp = np.polyval(_cp, _xp)
+            _ss_res_p = np.sum((_yp - _pp) ** 2)
+            _ss_tot_p = np.sum((_yp - _yp.mean()) ** 2)
+            _fwar_r2 = 1 - (_ss_res_p / _ss_tot_p) if _ss_tot_p > 0 else 0
+            _fwar_r2_str = f"R² = {_fwar_r2:.3f}"
+
+    # ── Build box HTML helper ─────────────────────────────────────────────────
+    def _box_html(box_id, label, team_name, val_str, logo_url="", img_html=""):
+        _sel_cls = "rk-box-sel" if box_id == _sel_box else ""
+        _href = f"?page=rankings&rk_box={box_id}&rk_year={sel_year}"
+        _logo_tag = (f"<img src='{logo_url}' width='36' height='36' "
+                     f"style='object-fit:contain;margin-bottom:4px;' "
+                     f"onerror=\"this.style.display='none'\">") if logo_url else ""
+        if img_html:
+            _logo_tag = img_html
+        return (
+            f"<a href='{_href}' target='_self' style='text-decoration:none;color:inherit;'>"
+            f"<div class='rk-answer {_sel_cls}'>"
+            f"{_logo_tag}"
+            f"<div class='rk-q'>{label}</div>"
+            f"<div class='rk-team'>{team_name}</div>"
+            f"<div class='rk-val'>{val_str}</div>"
+            f"</div></a>"
+        )
+
+    def _player_box_html(box_id, title, pname, pteam, pval, psub=""):
+        _sel_cls = "rk-box-sel" if box_id == _sel_box else ""
+        _href = f"?page=rankings&rk_box={box_id}&rk_year={sel_year}"
+        mid = _mlbam.get(_fix_player_name(pname), "") if _mlbam else ""
+        _img = (f"<img src='{_headshot_url(mid, 120)}' width='60' height='60' "
+                f"style='border-radius:50%;object-fit:cover;margin-bottom:4px;' "
+                f"onerror=\"this.style.display='none'\">") if mid else ""
+        _sub_html = f"<div style='font-size:0.62rem;color:#4a687e;'>{psub}</div>" if psub else ""
+        return (
+            f"<a href='{_href}' target='_self' style='text-decoration:none;color:inherit;'>"
+            f"<div class='rk-answer {_sel_cls}'>"
+            f"<div class='rk-q'>{title}</div>{_img}"
+            f"<div class='rk-team'>{pname}</div>"
+            f"<div style='font-size:0.75rem;color:#93b8d8;'>{pteam}</div>"
+            f"<div class='rk-val'>{pval}</div>"
+            f"{_sub_html}</div></a>"
+        )
+
+    # ── Row 1 + Row 2: Team boxes ─────────────────────────────────────────────
+    _box_defs = [
+        ("most_efficient", "MOST EFFICIENT", _full(_best_eff),
+         f"${_best_eff['dollar_gap_M']:.0f}M below the line", _team_logo_url(_best_eff["Team"])),
+        ("top_overperformer", "TOP OVERPERFORMER", _full(_overperf),
+         f"+{_overperf['wins_vs_pred']:.1f} wins vs forecast", _team_logo_url(_overperf["Team"])),
+        ("best_dpw", "BEST $/fWAR", _full(_best_dpw),
+         f"${_best_dpw['DPW']:.1f}M per fWAR", _team_logo_url(_best_dpw["Team"])),
+        ("least_efficient", "LEAST EFFICIENT", _full(_worst_eff),
+         f"${_worst_eff['dollar_gap_M']:.0f}M above the line", _team_logo_url(_worst_eff["Team"])),
+        ("top_fwar", "TOP fWAR", _full(_top_war),
+         f"{_top_war['team_WAR']:.1f} total fWAR", _team_logo_url(_top_war["Team"])),
+        ("most_wins", "MOST WINS", _full(_top_wins),
+         f"{int(_top_wins['Wins'])} wins", _team_logo_url(_top_wins["Team"])),
+    ]
+
+    _grid_html = "<div class='rk-grid'>"
+    for box_id, label, team_name, val_str, logo_url in _box_defs:
+        _grid_html += _box_html(box_id, label, team_name, val_str, logo_url=logo_url)
+    _grid_html += "</div>"
+    st.markdown(_grid_html, unsafe_allow_html=True)
+
+    # ── Row 3: Player award boxes ─────────────────────────────────────────────
+    _p_grid_html = "<div class='rk-grid'>"
+    _p_count = 0
+    if _p_top_war is not None:
+        _p_grid_html += _player_box_html(
+            "p_top_fwar", f"#1 fWAR ({sel_year})", str(_p_top_war["Player"]),
+            str(_p_top_war["Team"]), f"{_p_top_war['WAR_Total']:.1f} fWAR")
+        _p_count += 1
+    if _p_best_val is not None:
+        _p_grid_html += _player_box_html(
+            "p_contract_val", "TOP CONTRACT VALUE", str(_p_best_val["Player"]),
+            str(_p_best_val["Team"]), f"{_p_best_val['_wpm']:.2f} fWAR/$M",
+            f"{_p_best_val['WAR_Total']:.1f} fWAR · ${_p_best_val['Salary_M']:.1f}M")
+        _p_count += 1
+    if _p_best_wsr is not None:
+        _p_grid_html += _player_box_html(
+            "p_stability", "BEST fWAR STABILITY", str(_p_best_wsr["Player"]),
+            str(_p_best_wsr["Team"]), f"{_p_best_wsr['WSR']:.2f} WSR",
+            f"Avg {_p_best_wsr['_mean']:.1f} fWAR · {int(_p_best_wsr['_n'])} seasons")
+        _p_count += 1
+    _p_grid_html += "</div>"
+    if _p_count > 0:
+        st.markdown(_p_grid_html, unsafe_allow_html=True)
+
+    # ── Row 4: New analysis boxes ─────────────────────────────────────────────
+    _r4_html = "<div class='rk-grid'>"
+    _r4_html += _box_html("best_marginal", "BEST MARGINAL SPENDING", _best_marginal_name, _best_marginal_val)
+    _top_rss_logo = _team_logo_url(_top_rss_team) if _top_rss_team != "N/A" else ""
+    _r4_html += _box_html("top_rss", "TOP ROSTER STABILITY", _top_rss_team, _top_rss_val, logo_url=_top_rss_logo)
+    _r4_html += _box_html("fwar_wins_link", "STRONGEST fWAR-WINS LINK", "All Teams", _fwar_r2_str)
+    _r4_html += "</div>"
+    st.markdown(_r4_html, unsafe_allow_html=True)
+
     # Animated hint (disappears after first click)
     if not st.session_state.get("rk_box_clicked"):
-        st.markdown("<div class='rk-hint'>👆 Click a box above to explore</div>", unsafe_allow_html=True)
+        st.markdown("<div class='rk-hint'>Click a box above to explore</div>", unsafe_allow_html=True)
 
     st.markdown("<div style='margin-top:0.5rem;'></div>", unsafe_allow_html=True)
-
-    # ── Content area — controlled by selected box ──────────────────────────
-    _TAB_LABELS = {"efficiency": "🏆 Efficiency", "fwar": "⭐ fWAR",
-                   "salary": "💰 Salary", "winperf": "📈 Win Performance"}
-    st.markdown(
-        f"<div style='font-size:0.88rem;font-weight:700;color:#d6e8f8;margin:0.5rem 0 0.4rem;'>"
-        f"{_TAB_LABELS.get(_act_tab, '')}</div>",
-        unsafe_allow_html=True,
-    )
 
     def _hbar(df_in, x_col, color_fn, title, x_label, text_fn=None, zero_line=False):
         """Render a themed horizontal bar chart for rankings."""
@@ -8122,8 +8189,15 @@ def _render_rankings_page():
         ))
         return fig
 
+    # ── Tabs ─────────────────────────────────────────────────────────────────
+    _tab_default = _TAB_ORDER.index(_act_tab) if _act_tab in _TAB_ORDER else 0
+    rt1, rt2, rt3, rt4, rt5, rt6 = st.tabs([
+        "🏆 Efficiency", "⭐ fWAR", "💰 Salary", "📈 Win Performance",
+        "💎 Contract Value", "🔒 Stability",
+    ])
+
     # ── Tab 1: Efficiency ─────────────────────────────────────────────────────
-    if _act_tab == "efficiency":
+    with rt1:
         st.markdown(
             "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;'>"
             "Dollar gap from the <b>Cost Effective Line</b> — how much more or less each team "
@@ -8168,8 +8242,45 @@ def _render_rankings_page():
                 height=min(60 + len(_e) * 35, 720),
             )
 
+        # Multi-year summary
+        with st.expander("📊 Multi-Year Summary (2025-2021)", expanded=False):
+            st.caption(
+                "5-year averages from the efficiency analysis. "
+                "**Avg Gap** = average dollars above/below the cost-effective line per season — "
+                "negative means the team consistently spends below market rate for their wins."
+            )
+            _rk = ranking_df.sort_values("Leag_Rank").reset_index(drop=True).copy()
+            _rk.insert(0, "#", range(1, len(_rk) + 1))
+            _rk_cols = [c for c in ["#", "Abbr", "Team", "Division",
+                                     "Avg_Wins", "Avg_Pay_M", "Avg_$/WAR_M", "Avg_Gap_M",
+                                     "Playoff_Apps", "WS_Wins"] if c in _rk.columns]
+            _rk = _rk[_rk_cols].rename(columns={
+                "Abbr": "Abbr", "Team": "Team", "Division": "Division",
+                "Avg_Wins": "Avg Wins", "Avg_Pay_M": "Avg Pay $M",
+                "Avg_$/WAR_M": "$/fWAR M", "Avg_Gap_M": "Avg Gap $M",
+                "Playoff_Apps": "Playoffs (5yr)", "WS_Wins": "WS",
+            })
+
+            def _rk_clr(row):
+                try:
+                    g = row["Avg Gap $M"]
+                    if g < -100: return ["background-color:#0c2218"] * len(row)
+                    if g < 0:    return ["background-color:#14532d55"] * len(row)
+                    if g > 100:  return ["background-color:#2d0c0c"] * len(row)
+                except Exception:
+                    pass
+                return [""] * len(row)
+
+            _rk["Avg Pay $M"] = _rk["Avg Pay $M"].round(0).astype(int)
+            _rk["Avg Gap $M"] = _rk["Avg Gap $M"].round(0).astype(int)
+            _rk["$/fWAR M"]    = _rk["$/fWAR M"].round(2)
+            st.dataframe(
+                _rk.style.apply(_rk_clr, axis=1),
+                hide_index=True, use_container_width=True, height=680,
+            )
+
     # ── Tab 2: fWAR ───────────────────────────────────────────────────────────
-    if _act_tab == "fwar":
+    with rt2:
         st.markdown(
             "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;'>"
             "Total team WAR for the selected season across all pitchers and position players. "
@@ -8211,8 +8322,183 @@ def _render_rankings_page():
                 height=min(60 + len(_w) * 35, 720),
             )
 
+        # Player Rankings — Top 25 by fWAR
+        st.markdown("---")
+        st.markdown("### Player Rankings")
+        st.markdown(
+            "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
+            f"Top 25 individual players by fWAR for the <b>{sel_year}</b> season.</div>",
+            unsafe_allow_html=True,
+        )
+        try:
+            _pr_df = _paw_df if _paw_df is not None else _read_csv(_data_url("data/mlb_combined_2021_2025.csv"))
+            _pr_df_c = _pr_df.copy()
+            _pr_df_c["Year"] = pd.to_numeric(_pr_df_c["Year"], errors="coerce")
+            _pr_df_c["WAR_Total"] = pd.to_numeric(_pr_df_c["WAR_Total"], errors="coerce")
+            _pr_df_c["Salary_M"] = pd.to_numeric(_pr_df_c["Salary_M"], errors="coerce")
+            _pr_yr = _pr_df_c[_pr_df_c["Year"] == sel_year].copy()
+            _pr_yr = _pr_yr.dropna(subset=["WAR_Total"]).sort_values("WAR_Total", ascending=False).head(25)
+            if not _pr_yr.empty:
+                _pr_show = _pr_yr[["Player", "Team", "Position", "WAR_Total", "Salary_M"]].reset_index(drop=True)
+                _pr_show.insert(0, "#", range(1, len(_pr_show) + 1))
+                _pr_show = _pr_show.rename(columns={
+                    "WAR_Total": "fWAR", "Salary_M": "Salary $M",
+                })
+                _pr_show["Salary $M"] = _pr_show["Salary $M"].round(1)
+                _pr_show["fWAR"] = _pr_show["fWAR"].round(1)
+                st.dataframe(_pr_show, hide_index=True, width="stretch", height=500)
+            else:
+                st.info(f"No player data available for {sel_year}.")
+        except Exception as _pr_e:
+            st.warning(f"Could not load player rankings: {_pr_e}")
+
+        # fWAR-to-Wins Relationship
+        st.markdown("---")
+        st.markdown("### fWAR-to-Wins Relationship")
+        st.markdown(
+            "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
+            "Team fWAR (total roster talent) is one of the strongest predictors of regular-season wins. "
+            "Each dot below is one team-season. <span style='color:#22c55e;font-weight:600;'>Green</span> = "
+            "made the playoffs. The orange regression line shows the expected wins for a given fWAR level. "
+            "The vertical blue dashed line marks the ~30 fWAR threshold — teams consistently above it are "
+            "postseason contenders.</div>",
+            unsafe_allow_html=True,
+        )
+
+        if "team_WAR" in detail_df.columns and "Wins" in detail_df.columns:
+            _f1 = detail_df.dropna(subset=["team_WAR", "Wins"]).copy()
+            _f1["team_WAR"] = pd.to_numeric(_f1["team_WAR"], errors="coerce")
+            _f1["Wins"] = pd.to_numeric(_f1["Wins"], errors="coerce")
+            _f1 = _f1.dropna(subset=["team_WAR", "Wins"])
+
+            if len(_f1) > 5:
+                _x = _f1["team_WAR"].values
+                _y = _f1["Wins"].values
+                _coef = np.polyfit(_x, _y, 1)
+                _pred = np.polyval(_coef, _x)
+                _ss_res = np.sum((_y - _pred) ** 2)
+                _ss_tot = np.sum((_y - _y.mean()) ** 2)
+                _r2 = 1 - (_ss_res / _ss_tot) if _ss_tot > 0 else 0
+
+                st.markdown(
+                    f"<div style='font-size:0.88rem;color:#d6e8f8;font-weight:600;margin-bottom:0.5rem;'>"
+                    f"fWAR explains <span style='color:#60a5fa;'>{_r2 * 100:.1f}%</span> of win variation "
+                    f"across {len(_f1)} team-seasons (2025-2021). Each additional fWAR is worth roughly "
+                    f"<span style='color:#60a5fa;'>{_coef[0]:.2f}</span> wins.</div>",
+                    unsafe_allow_html=True,
+                )
+
+                _f1_playoff = _f1.get("in_playoffs", pd.Series([False] * len(_f1)))
+                _f1_colors = ["#22c55e" if p else "#4a687e" for p in _f1_playoff]
+                _f1_hover = _f1.apply(lambda r: (
+                    f"<b>{r['Team']}</b> {int(r['Year'])}<br>"
+                    + f"fWAR: {r['team_WAR']:.1f} · Wins: {int(r['Wins'])}<br>"
+                    + f"Playoff: {'Yes' if r.get('in_playoffs') else 'No'}"
+                ), axis=1)
+
+                fig_f1 = go.Figure()
+                fig_f1.add_trace(go.Scatter(
+                    x=_f1["team_WAR"], y=_f1["Wins"], mode="markers",
+                    marker=dict(color=_f1_colors, size=8, opacity=0.8),
+                    text=_f1_hover, hovertemplate="%{text}<extra></extra>",
+                    name="Teams",
+                ))
+                _xr = np.linspace(_x.min(), _x.max(), 100)
+                fig_f1.add_trace(go.Scatter(
+                    x=_xr, y=np.polyval(_coef, _xr), mode="lines",
+                    line=dict(color="#f4a261", width=2), name=f"OLS (R\u00b2={_r2:.3f})",
+                ))
+                fig_f1.add_vline(x=30, line_dash="dash", line_color="#3b6fd4", opacity=0.5,
+                                 annotation_text="Avg contender floor", annotation_position="top right",
+                                 annotation_font_color="#3b6fd4")
+
+                fig_f1.update_layout(**_pt(
+                    title="Team fWAR vs Actual Wins (2025-2021)",
+                    xaxis=dict(title="Total Team fWAR"),
+                    yaxis=dict(title="Actual Wins"),
+                    height=440, showlegend=True,
+                    legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
+                    hoverlabel=dict(bgcolor="#0d1f38", bordercolor="#1e3a5f",
+                                    font=dict(color="#dbeafe", size=12)),
+                ))
+                _f1_col, _ = st.columns([3, 1])
+                with _f1_col:
+                    st.plotly_chart(fig_f1, width="stretch")
+
+            # Efficiency vs Postseason table
+            if {"dollar_gap_M", "in_playoffs", "ws_champ"}.issubset(detail_df.columns):
+                _eff_tbl = detail_df.groupby("Team").agg(
+                    Avg_Gap=("dollar_gap_M", "mean"),
+                    Playoff_Apps=("in_playoffs", "sum"),
+                    WS_Apps=("ws_champ", lambda x: int(x.sum()) + int(detail_df.loc[x.index, "ws_runnerup"].sum()) if "ws_runnerup" in detail_df.columns else int(x.sum())),
+                    WS_Wins=("ws_champ", "sum"),
+                ).reset_index()
+                _eff_tbl["Avg_Gap"] = _eff_tbl["Avg_Gap"].round(1)
+                _eff_tbl["Playoff_Apps"] = _eff_tbl["Playoff_Apps"].astype(int)
+                _eff_tbl["WS_Wins"] = _eff_tbl["WS_Wins"].astype(int)
+
+                def _eff_tier(gap):
+                    if gap < -20: return ("Elite Value", "#22c55e")
+                    if gap < -5:  return ("Efficient", "#14b8a6")
+                    if gap <= 5:  return ("Market Rate", "#6b7280")
+                    return ("Overpaying", "#ef4444")
+
+                _eff_tbl["Tier"] = _eff_tbl["Avg_Gap"].apply(lambda g: _eff_tier(g)[0])
+                _eff_tbl = _eff_tbl.sort_values("Avg_Gap")
+
+                st.markdown("#### Efficiency vs Postseason Outcomes (2025-2021)")
+
+                _n_teams = len(_eff_tbl)
+                _tier_size = max(1, _n_teams // 5)
+                def _rank_tier(idx):
+                    if idx < _tier_size:     return "Top Tier"
+                    if idx < _tier_size * 2: return "Above Average"
+                    if idx < _tier_size * 3: return "Average"
+                    if idx < _tier_size * 4: return "Below Average"
+                    return "Bottom"
+                _eff_tbl["Efficiency Tier"] = [_rank_tier(i) for i in range(len(_eff_tbl))]
+                _eff_tbl.insert(0, "#", range(1, len(_eff_tbl) + 1))
+
+                _RANK_CLR = {"Top Tier": "#14532d", "Above Average": "#1a3a20",
+                             "Average": "", "Below Average": "#2d1f0c", "Bottom": "#2d0c0c"}
+                def _tier_clr(row):
+                    bg = _RANK_CLR.get(row.get("Efficiency Tier", ""), "")
+                    return [f"background-color:{bg}"] * len(row) if bg else [""] * len(row)
+
+                _eff_disp = _eff_tbl.drop(columns=["Tier"], errors="ignore").rename(columns={
+                    "Avg_Gap": "Avg Gap ($M)", "Playoff_Apps": "Playoff Apps",
+                    "WS_Apps": "WS Appearances", "WS_Wins": "WS Wins",
+                })
+                st.dataframe(
+                    _eff_disp.style.apply(_tier_clr, axis=1).format(
+                        {"Avg Gap ($M)": "{:.1f}"}, na_rep="—"),
+                    hide_index=True, use_container_width=True, height=400,
+                )
+
+                _eff_good = _eff_tbl[_eff_tbl["Avg_Gap"] < -10]
+                _eff_bad  = _eff_tbl[_eff_tbl["Avg_Gap"] > 10]
+                _n_seasons = len(detail_df["Year"].unique())
+                if not _eff_good.empty and not _eff_bad.empty:
+                    _good_pct = _eff_good["Playoff_Apps"].sum() / (len(_eff_good) * _n_seasons) * 100
+                    _bad_pct  = _eff_bad["Playoff_Apps"].sum() / (len(_eff_bad) * _n_seasons) * 100
+                    st.info(
+                        f"Among the {len(_eff_good)} most efficient teams (gap < -$10M), "
+                        f"{_eff_good['Playoff_Apps'].sum()} made the playoffs "
+                        f"({_good_pct:.0f}% of seasons) vs {_bad_pct:.0f}% for the "
+                        f"{len(_eff_bad)} least efficient teams."
+                    )
+
+                st.markdown(
+                    "<div style='background:#0d1e35;border-left:3px solid #3b6fd4;border-radius:0 8px 8px 0;"
+                    "padding:0.7rem 1rem;margin-top:0.6rem;font-size:0.82rem;color:#93b8d8;line-height:1.6;'>"
+                    "<b style='color:#60a5fa;'>Research context:</b> Over the past decade, World Series "
+                    "champions averaged 8th in payroll — efficient roster construction matters more than "
+                    "total spend once you reach the postseason.</div>",
+                    unsafe_allow_html=True,
+                )
+
     # ── Tab 3: Salary ─────────────────────────────────────────────────────────
-    if _act_tab == "salary":
+    with rt3:
         st.markdown(
             "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;'>"
             "Team payroll for the selected season. Use $/WAR to compare how much each team "
@@ -8225,7 +8511,6 @@ def _render_rankings_page():
 
         ch3, tb3 = st.columns([3, 2])
         with ch3:
-            # Gold→blue gradient: highest spenders = gold, lowest = muted blue
             st.plotly_chart(_hbar(
                 _sal, "payroll_M",
                 color_fn=lambda v: (
@@ -8257,8 +8542,86 @@ def _render_rankings_page():
                 height=min(60 + len(_s) * 35, 720),
             )
 
+        # Marginal Spending Impact
+        st.markdown("---")
+        st.markdown("### Marginal Spending Impact")
+        st.markdown(
+            "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
+            "Not all payroll dollars spent are equal. The first $100M spent gains the most wins per $ "
+            "than the next tier $244M to $300M+. Based on this nonlinear relationship, each bar below "
+            "shows how many additional wins a team can expect per $10M spent within that spending tier, "
+            "based on 2021-2025 data. "
+            "<span style='color:#22c55e;font-weight:600;'>Green</span> = strong return, "
+            "<span style='color:#f59e0b;font-weight:600;'>amber</span> = moderate, "
+            "<span style='color:#ef4444;font-weight:600;'>red</span> = diminishing returns.</div>",
+            unsafe_allow_html=True,
+        )
+
+        if {"payroll_M", "Wins"}.issubset(detail_df.columns):
+            _f2 = detail_df.dropna(subset=["payroll_M", "Wins"]).copy()
+            _f2["payroll_M"] = pd.to_numeric(_f2["payroll_M"], errors="coerce")
+            _f2["Wins"]      = pd.to_numeric(_f2["Wins"], errors="coerce")
+
+            _TIERS = [
+                ("Budget ($0-100M)",       0,   100),
+                ("Mid-Market ($100-175M)", 100, 175),
+                ("Contender ($175-244M)",  175, 244),
+                ("Big Market ($244M+)",    244, 999),
+            ]
+
+            _slopes = []
+            for name, lo, hi in _TIERS:
+                tier_df = _f2[(_f2["payroll_M"] >= lo) & (_f2["payroll_M"] < hi)]
+                if len(tier_df) >= 5:
+                    c = np.polyfit(tier_df["payroll_M"], tier_df["Wins"], 1)
+                    wins_per_10m = c[0] * 10
+                else:
+                    wins_per_10m = 0
+                _slopes.append((name, round(wins_per_10m, 2)))
+
+            _sl_names  = [s[0] for s in _slopes]
+            _sl_vals   = [s[1] for s in _slopes]
+            _sl_colors = ["#22c55e" if v >= 1.0 else "#f59e0b" if v >= 0.3 else "#ef4444" for v in _sl_vals]
+
+            fig_f2 = go.Figure(go.Bar(
+                y=_sl_names, x=_sl_vals, orientation="h",
+                marker_color=_sl_colors,
+                text=[f"{v:+.2f} wins" for v in _sl_vals],
+                textposition="outside", textfont=dict(color="#dbeafe", size=10),
+                hovertemplate="%{y}: %{x:.2f} wins per $10M<extra></extra>",
+            ))
+            _xmax_f2 = max(abs(v) for v in _sl_vals) * 1.5 if _sl_vals else 3
+            fig_f2.update_layout(**_pt(
+                title="Marginal Wins per $10M by Spending Tier",
+                xaxis=dict(title="Wins per $10M spent",
+                           zeroline=True, zerolinecolor="#4a687e", zerolinewidth=1,
+                           range=[-_xmax_f2, _xmax_f2]),
+                yaxis=dict(autorange="reversed"),
+                height=300,
+                margin=dict(l=180, r=80, t=40, b=40),
+            ))
+            _f2_col, _ = st.columns([3, 1])
+            with _f2_col:
+                st.plotly_chart(fig_f2, width="stretch")
+
+            _spend_add = st.slider("Add spending ($M)", 0, 50, 10, step=5,
+                                    key="v2_spend_slider")
+            if _spend_add > 0 and _slopes:
+                _cur_tier_idx = 1
+                _cur_slope = _slopes[_cur_tier_idx][1]
+                _add_wins = _cur_slope * (_spend_add / 10)
+                st.markdown(
+                    f"<div style='background:#0d1e35;border:1px solid #1e3250;border-radius:8px;"
+                    f"padding:0.8rem 1rem;font-size:0.85rem;color:#d6e8f8;'>"
+                    f"Adding <b>${_spend_add}M</b> at the <b>{_slopes[_cur_tier_idx][0]}</b> tier "
+                    f"buys ~<b>{_add_wins:.1f}</b> additional wins "
+                    f"(slope: {_cur_slope:.2f} wins/$10M)."
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+
     # ── Tab 4: Win Performance ────────────────────────────────────────────────
-    if _act_tab == "winperf":
+    with rt4:
         st.markdown(
             "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;'>"
             "Actual wins minus the wins <b>predicted by payroll</b> from the league regression. "
@@ -8283,15 +8646,15 @@ def _render_rankings_page():
         with tb4:
             _vp = _wvp[["Rank", "Team", "Wins", "pred_wins", "wins_vs_pred",
                          "payroll_M", "in_playoffs"]].copy()
-            _vp.columns = ["#", "Team", "Wins", "Predicted", "Δ Wins", "Payroll $M", "Postseason"]
+            _vp.columns = ["#", "Team", "Wins", "Predicted", "\u0394 Wins", "Payroll $M", "Postseason"]
             _vp["Wins"]       = _vp["Wins"].round(0).astype(int)
             _vp["Predicted"]  = _vp["Predicted"].round(1)
-            _vp["Δ Wins"]     = _vp["Δ Wins"].round(1)
+            _vp["\u0394 Wins"]     = _vp["\u0394 Wins"].round(1)
             _vp["Payroll $M"] = _vp["Payroll $M"].round(0).astype(int)
-            _vp["Postseason"]  = _vp["Postseason"].map({True: "✓", False: ""})
+            _vp["Postseason"]  = _vp["Postseason"].map({True: "\u2713", False: ""})
 
             def _vp_clr(row):
-                d = row["Δ Wins"]
+                d = row["\u0394 Wins"]
                 if d > 10:  return ["background-color:#0c2218"] * len(row)
                 if d > 0:   return ["background-color:#14532d55"] * len(row)
                 if d < -10: return ["background-color:#2d0c0c"] * len(row)
@@ -8300,420 +8663,234 @@ def _render_rankings_page():
 
             st.dataframe(
                 _vp.style.apply(_vp_clr, axis=1).format(
-                    {"Wins": "{:d}", "Predicted": "{:.1f}", "Δ Wins": "{:+.1f}", "Payroll $M": "{:d}"}, na_rep="—"),
+                    {"Wins": "{:d}", "Predicted": "{:.1f}", "\u0394 Wins": "{:+.1f}", "Payroll $M": "{:d}"}, na_rep="\u2014"),
                 hide_index=True, use_container_width=True,
                 height=min(60 + len(_vp) * 35, 720),
             )
 
-    # ── Multi-year summary ────────────────────────────────────────────────────
-    with st.expander("📊 Multi-Year Summary (2025–2021)", expanded=False):
-        st.caption(
-            "5-year averages from the efficiency analysis. "
-            "**Avg Gap** = average dollars above/below the cost-effective line per season — "
-            "negative means the team consistently spends below market rate for their wins."
+    # ── Tab 5: Contract Value ─────────────────────────────────────────────────
+    with rt5:
+        st.markdown(
+            "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;'>"
+            "Player contract value measured as fWAR per $M of salary. Higher values mean "
+            "more on-field production per dollar spent. Players earning &gt;$1M included.</div>",
+            unsafe_allow_html=True,
         )
-        _rk = ranking_df.sort_values("Leag_Rank").reset_index(drop=True).copy()
-        _rk.insert(0, "#", range(1, len(_rk) + 1))
-        _rk_cols = [c for c in ["#", "Abbr", "Team", "Division",
-                                 "Avg_Wins", "Avg_Pay_M", "Avg_$/WAR_M", "Avg_Gap_M",
-                                 "Playoff_Apps", "WS_Wins"] if c in _rk.columns]
-        _rk = _rk[_rk_cols].rename(columns={
-            "Abbr": "Abbr", "Team": "Team", "Division": "Division",
-            "Avg_Wins": "Avg Wins", "Avg_Pay_M": "Avg Pay $M",
-            "Avg_$/WAR_M": "$/fWAR M", "Avg_Gap_M": "Avg Gap $M",
-            "Playoff_Apps": "Playoffs (5yr)", "WS_Wins": "WS",
-        })
+        try:
+            if _paw_df is not None and not _paw_25.empty:
+                _cv_df = _paw_25[_paw_25["Salary_M"] > 1.0].copy()
+                _cv_df["fWAR_per_M"] = (_cv_df["WAR_Total"] / _cv_df["Salary_M"].clip(lower=0.1)).round(2)
+                _cv_top = _cv_df.sort_values("fWAR_per_M", ascending=False).head(15)
 
-        def _rk_clr(row):
-            try:
-                g = row["Avg Gap $M"]
-                if g < -100: return ["background-color:#0c2218"] * len(row)
-                if g < 0:    return ["background-color:#14532d55"] * len(row)
-                if g > 100:  return ["background-color:#2d0c0c"] * len(row)
-            except Exception:
-                pass
-            return [""] * len(row)
+                _cv_left, _cv_right = st.columns([7, 3])
+                with _cv_left:
+                    if not _cv_top.empty:
+                        _cv_vals = _cv_top["fWAR_per_M"].tolist()
+                        _cv_names = _cv_top["Player"].tolist()
+                        _cv_colors = ["#22c55e" if v >= 1.0 else "#4873b8" if v >= 0.5 else "#4a687e" for v in _cv_vals]
+                        fig_cv = go.Figure(go.Bar(
+                            y=_cv_names, x=_cv_vals, orientation="h",
+                            marker=dict(color=_cv_colors, line=dict(width=0)),
+                            text=[f"{v:.2f}" for v in _cv_vals],
+                            textposition="outside",
+                            textfont=dict(color="#d6e8f8", size=9),
+                            hovertemplate="%{y}: %{x:.2f} fWAR/$M<extra></extra>",
+                        ))
+                        fig_cv.update_layout(**_pt(
+                            title=f"{sel_year} — Top 15 Players by fWAR/$M",
+                            xaxis=dict(title="fWAR per $M"),
+                            yaxis=dict(autorange="reversed"),
+                            height=max(340, len(_cv_top) * 28),
+                            margin=dict(l=120, r=80, t=42, b=30),
+                        ))
+                        st.plotly_chart(fig_cv, use_container_width=True, config={"displayModeBar": False})
+                with _cv_right:
+                    # Avg fWAR/$M by contract stage
+                    if "Stage_Clean" in _cv_df.columns:
+                        _stage_avg = _cv_df.groupby("Stage_Clean")["fWAR_per_M"].mean().round(2)
+                        _stage_map = {"Pre-Arb": "Pre-Arb", "Arb": "Arbitration", "FA": "Free Agent"}
+                        for _stg_key in ["Pre-Arb", "Arb", "FA"]:
+                            _stg_val = _stage_avg.get(_stg_key, 0)
+                            _stg_label = _stage_map.get(_stg_key, _stg_key)
+                            _stg_color = "#22c55e" if _stg_val >= 0.8 else "#f59e0b" if _stg_val >= 0.4 else "#ef4444"
+                            st.markdown(
+                                f"<div class='rk-answer' style='min-height:90px;margin-bottom:0.5rem;'>"
+                                f"<div class='rk-q'>{_stg_label}</div>"
+                                f"<div class='rk-team' style='color:{_stg_color};'>{_stg_val:.2f}</div>"
+                                f"<div class='rk-val'>avg fWAR/$M</div></div>",
+                                unsafe_allow_html=True,
+                            )
+                    else:
+                        st.caption("Stage data not available for breakdown.")
+            else:
+                st.info("Player data not available for contract value analysis.")
+        except Exception as _cv_e:
+            st.warning(f"Could not compute contract value data: {_cv_e}")
 
-        _rk["Avg Pay $M"] = _rk["Avg Pay $M"].round(0).astype(int)
-        _rk["Avg Gap $M"] = _rk["Avg Gap $M"].round(0).astype(int)
-        _rk["$/fWAR M"]    = _rk["$/fWAR M"].round(2)
-        st.dataframe(
-            _rk.style.apply(_rk_clr, axis=1),
-            hide_index=True, use_container_width=True, height=680,
+    # ── Tab 6: Stability ──────────────────────────────────────────────────────
+    with rt6:
+        st.markdown(
+            "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;'>"
+            "WAR Stability Rating (WSR) measures how consistently a player produces fWAR across "
+            "seasons. Calculated as mean fWAR / (1 + std dev). Players with 3+ seasons included.</div>",
+            unsafe_allow_html=True,
         )
+        try:
+            if not _wsr_grp.empty:
+                _wsr_top = _wsr_grp.sort_values("WSR", ascending=False).head(15)
 
-    # ══════════════════════════════════════════════════════════════════════
-    # Player Rankings — Top 25 by fWAR
-    # ══════════════════════════════════════════════════════════════════════
-    st.markdown("---")
-    st.markdown("### Player Rankings")
-    st.markdown(
-        "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
-        f"Top 25 individual players by fWAR for the <b>{sel_year}</b> season.</div>",
-        unsafe_allow_html=True,
-    )
-    try:
-        _pr_csv = _data_url("data/mlb_combined_2021_2025.csv")
-        _pr_df = _read_csv(_pr_csv)
-        _pr_df["Year"] = pd.to_numeric(_pr_df["Year"], errors="coerce")
-        _pr_df["WAR_Total"] = pd.to_numeric(_pr_df["WAR_Total"], errors="coerce")
-        _pr_df["Salary_M"] = pd.to_numeric(_pr_df["Salary_M"], errors="coerce")
-        _pr_yr = _pr_df[_pr_df["Year"] == sel_year].copy()
-        _pr_yr = _pr_yr.dropna(subset=["WAR_Total"]).sort_values("WAR_Total", ascending=False).head(25)
-        if not _pr_yr.empty:
-            _pr_show = _pr_yr[["Player", "Team", "Position", "WAR_Total", "Salary_M"]].reset_index(drop=True)
-            _pr_show.insert(0, "#", range(1, len(_pr_show) + 1))
-            _pr_show = _pr_show.rename(columns={
-                "WAR_Total": "fWAR", "Salary_M": "Salary $M",
-            })
-            _pr_show["Salary $M"] = _pr_show["Salary $M"].round(1)
-            _pr_show["fWAR"] = _pr_show["fWAR"].round(1)
-            st.dataframe(_pr_show, hide_index=True, width="stretch", height=500)
-        else:
-            st.info(f"No player data available for {sel_year}.")
-    except Exception as _pr_e:
-        st.warning(f"Could not load player rankings: {_pr_e}")
+                _ws_left, _ws_right = st.columns([7, 3])
+                with _ws_left:
+                    _ws_vals = _wsr_top["WSR"].tolist()
+                    _ws_names = _wsr_top["Player"].tolist()
+                    _ws_colors = ["#22c55e" if v >= 3.0 else "#4873b8" if v >= 1.5 else "#4a687e" for v in _ws_vals]
+                    fig_ws = go.Figure(go.Bar(
+                        y=_ws_names, x=_ws_vals, orientation="h",
+                        marker=dict(color=_ws_colors, line=dict(width=0)),
+                        text=[f"{v:.2f}" for v in _ws_vals],
+                        textposition="outside",
+                        textfont=dict(color="#d6e8f8", size=9),
+                        hovertemplate="%{y}: %{x:.2f} WSR<extra></extra>",
+                    ))
+                    fig_ws.update_layout(**_pt(
+                        title="Top 15 Players by WAR Stability Rating (WSR)",
+                        xaxis=dict(title="WSR (mean fWAR / (1 + std))"),
+                        yaxis=dict(autorange="reversed"),
+                        height=max(340, len(_wsr_top) * 28),
+                        margin=dict(l=120, r=80, t=42, b=30),
+                    ))
+                    st.plotly_chart(fig_ws, use_container_width=True, config={"displayModeBar": False})
+                with _ws_right:
+                    # Avg WSR by contract stage
+                    if _paw_df is not None and "Stage_Clean" in _paw_df.columns:
+                        _paw_stg = _paw_df.dropna(subset=["WAR_Total"])
+                        _stg_wsr = _paw_stg.groupby(["Player", "Stage_Clean"]).agg(
+                            _mean=("WAR_Total", "mean"), _std=("WAR_Total", "std"),
+                            _n=("Year", "nunique"),
+                        ).reset_index()
+                        _stg_wsr = _stg_wsr[_stg_wsr["_n"] >= 2].copy()
+                        _stg_wsr["_std"] = _stg_wsr["_std"].fillna(0)
+                        _stg_wsr["WSR"] = (_stg_wsr["_mean"] / (1 + _stg_wsr["_std"])).round(2)
+                        _stg_avg_wsr = _stg_wsr.groupby("Stage_Clean")["WSR"].mean().round(2)
+                        _stage_map = {"Pre-Arb": "Pre-Arb", "Arb": "Arbitration", "FA": "Free Agent"}
+                        for _stg_key in ["Pre-Arb", "Arb", "FA"]:
+                            _stg_val = _stg_avg_wsr.get(_stg_key, 0)
+                            _stg_label = _stage_map.get(_stg_key, _stg_key)
+                            _stg_color = "#22c55e" if _stg_val >= 1.5 else "#f59e0b" if _stg_val >= 0.8 else "#ef4444"
+                            st.markdown(
+                                f"<div class='rk-answer' style='min-height:90px;margin-bottom:0.5rem;'>"
+                                f"<div class='rk-q'>{_stg_label}</div>"
+                                f"<div class='rk-team' style='color:{_stg_color};'>{_stg_val:.2f}</div>"
+                                f"<div class='rk-val'>avg WSR</div></div>",
+                                unsafe_allow_html=True,
+                            )
+                    else:
+                        st.caption("Stage data not available for breakdown.")
 
-    # ══════════════════════════════════════════════════════════════════════
-    # Feature 1 — "Does WAR Translate to Wins?"
-    # ══════════════════════════════════════════════════════════════════════
-    st.markdown("---")
-    st.markdown("### fWAR-to-Wins Relationship")
-    st.markdown(
-        "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
-        "Team fWAR (total roster talent) is one of the strongest predictors of regular-season wins. "
-        "Each dot below is one team-season. <span style='color:#22c55e;font-weight:600;'>Green</span> = "
-        "made the playoffs. The orange regression line shows the expected wins for a given fWAR level. "
-        "The vertical blue dashed line marks the ~30 fWAR threshold — teams consistently above it are "
-        "postseason contenders.</div>",
-        unsafe_allow_html=True,
-    )
-
-    if "team_WAR" in detail_df.columns and "Wins" in detail_df.columns:
-        _f1 = detail_df.dropna(subset=["team_WAR", "Wins"]).copy()
-        _f1["team_WAR"] = pd.to_numeric(_f1["team_WAR"], errors="coerce")
-        _f1["Wins"] = pd.to_numeric(_f1["Wins"], errors="coerce")
-        _f1 = _f1.dropna(subset=["team_WAR", "Wins"])
-
-        if len(_f1) > 5:
-            # Regression
-            _x = _f1["team_WAR"].values
-            _y = _f1["Wins"].values
-            _coef = np.polyfit(_x, _y, 1)
-            _pred = np.polyval(_coef, _x)
-            _ss_res = np.sum((_y - _pred) ** 2)
-            _ss_tot = np.sum((_y - _y.mean()) ** 2)
-            _r2 = 1 - (_ss_res / _ss_tot) if _ss_tot > 0 else 0
-
-            st.markdown(
-                f"<div style='font-size:0.88rem;color:#d6e8f8;font-weight:600;margin-bottom:0.5rem;'>"
-                f"fWAR explains <span style='color:#60a5fa;'>{_r2 * 100:.1f}%</span> of win variation "
-                f"across {len(_f1)} team-seasons (2025–2021). Each additional fWAR is worth roughly "
-                f"<span style='color:#60a5fa;'>{_coef[0]:.2f}</span> wins.</div>",
-                unsafe_allow_html=True,
-            )
-
-            # Build scatter
-            _f1_playoff = _f1.get("in_playoffs", pd.Series([False] * len(_f1)))
-            _f1_colors = ["#22c55e" if p else "#4a687e" for p in _f1_playoff]
-            _f1_hover = _f1.apply(lambda r: (
-                f"<b>{r['Team']}</b> {int(r['Year'])}<br>"
-                + f"fWAR: {r['team_WAR']:.1f} · Wins: {int(r['Wins'])}<br>"
-                + f"Playoff: {'Yes' if r.get('in_playoffs') else 'No'}"
-            ), axis=1)
-
-            fig_f1 = go.Figure()
-            fig_f1.add_trace(go.Scatter(
-                x=_f1["team_WAR"], y=_f1["Wins"], mode="markers",
-                marker=dict(color=_f1_colors, size=8, opacity=0.8),
-                text=_f1_hover, hovertemplate="%{text}<extra></extra>",
-                name="Teams",
-            ))
-            # Regression line
-            _xr = np.linspace(_x.min(), _x.max(), 100)
-            fig_f1.add_trace(go.Scatter(
-                x=_xr, y=np.polyval(_coef, _xr), mode="lines",
-                line=dict(color="#f4a261", width=2), name=f"OLS (R²={_r2:.3f})",
-            ))
-            # Reference line at WAR=30
-            fig_f1.add_vline(x=30, line_dash="dash", line_color="#3b6fd4", opacity=0.5,
-                             annotation_text="Avg contender floor", annotation_position="top right",
-                             annotation_font_color="#3b6fd4")
-
-            fig_f1.update_layout(**_pt(
-                title="Team fWAR vs Actual Wins (2025–2021)",
-                xaxis=dict(title="Total Team fWAR"),
-                yaxis=dict(title="Actual Wins"),
-                height=440, showlegend=True,
-                legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
-                hoverlabel=dict(bgcolor="#0d1f38", bordercolor="#1e3a5f",
-                                font=dict(color="#dbeafe", size=12)),
-            ))
-            _f1_col, _ = st.columns([3, 1])
-            with _f1_col:
-                st.plotly_chart(fig_f1, width="stretch")
-
-        # 1B — Efficiency vs Postseason table
-        if {"dollar_gap_M", "in_playoffs", "ws_champ"}.issubset(detail_df.columns):
-            _eff_tbl = detail_df.groupby("Team").agg(
-                Avg_Gap=("dollar_gap_M", "mean"),
-                Playoff_Apps=("in_playoffs", "sum"),
-                WS_Apps=("ws_champ", lambda x: int(x.sum()) + int(detail_df.loc[x.index, "ws_runnerup"].sum()) if "ws_runnerup" in detail_df.columns else int(x.sum())),
-                WS_Wins=("ws_champ", "sum"),
-            ).reset_index()
-            _eff_tbl["Avg_Gap"] = _eff_tbl["Avg_Gap"].round(1)
-            _eff_tbl["Playoff_Apps"] = _eff_tbl["Playoff_Apps"].astype(int)
-            _eff_tbl["WS_Wins"] = _eff_tbl["WS_Wins"].astype(int)
-
-            def _eff_tier(gap):
-                if gap < -20: return ("Elite Value", "#22c55e")
-                if gap < -5:  return ("Efficient", "#14b8a6")
-                if gap <= 5:  return ("Market Rate", "#6b7280")
-                return ("Overpaying", "#ef4444")
-
-            _eff_tbl["Tier"] = _eff_tbl["Avg_Gap"].apply(lambda g: _eff_tier(g)[0])
-            _eff_tbl = _eff_tbl.sort_values("Avg_Gap")
-
-            st.markdown("#### Efficiency vs Postseason Outcomes (2025–2021)")
-
-            # 5-tier ranking with color coding
-            _n_teams = len(_eff_tbl)
-            _tier_size = max(1, _n_teams // 5)
-            def _rank_tier(idx):
-                if idx < _tier_size:     return "Top Tier"
-                if idx < _tier_size * 2: return "Above Average"
-                if idx < _tier_size * 3: return "Average"
-                if idx < _tier_size * 4: return "Below Average"
-                return "Bottom"
-            _eff_tbl["Efficiency Tier"] = [_rank_tier(i) for i in range(len(_eff_tbl))]
-            _eff_tbl.insert(0, "#", range(1, len(_eff_tbl) + 1))
-
-            _RANK_CLR = {"Top Tier": "#14532d", "Above Average": "#1a3a20",
-                         "Average": "", "Below Average": "#2d1f0c", "Bottom": "#2d0c0c"}
-            def _tier_clr(row):
-                bg = _RANK_CLR.get(row.get("Efficiency Tier", ""), "")
-                return [f"background-color:{bg}"] * len(row) if bg else [""] * len(row)
-
-            # Drop the old Tier column, keep Efficiency Tier
-            _eff_disp = _eff_tbl.drop(columns=["Tier"], errors="ignore").rename(columns={
-                "Avg_Gap": "Avg Gap ($M)", "Playoff_Apps": "Playoff Apps",
-                "WS_Apps": "WS Appearances", "WS_Wins": "WS Wins",
-            })
-            st.dataframe(
-                _eff_disp.style.apply(_tier_clr, axis=1).format(
-                    {"Avg Gap ($M)": "{:.1f}"}, na_rep="—"),
-                hide_index=True, use_container_width=True, height=400,
-            )
-
-            # Auto-generated insight
-            _eff_good = _eff_tbl[_eff_tbl["Avg_Gap"] < -10]
-            _eff_bad  = _eff_tbl[_eff_tbl["Avg_Gap"] > 10]
-            _n_seasons = len(detail_df["Year"].unique())
-            if not _eff_good.empty and not _eff_bad.empty:
-                _good_pct = _eff_good["Playoff_Apps"].sum() / (len(_eff_good) * _n_seasons) * 100
-                _bad_pct  = _eff_bad["Playoff_Apps"].sum() / (len(_eff_bad) * _n_seasons) * 100
-                st.info(
-                    f"Among the {len(_eff_good)} most efficient teams (gap < -$10M), "
-                    f"{_eff_good['Playoff_Apps'].sum()} made the playoffs "
-                    f"({_good_pct:.0f}% of seasons) vs {_bad_pct:.0f}% for the "
-                    f"{len(_eff_bad)} least efficient teams."
+                # RSS section
+                st.markdown("---")
+                st.markdown("### Roster Stability and Win Correlation")
+                st.markdown(
+                    "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
+                    "Roster Stability Score (RSS) measures what percentage of a team's qualifying players "
+                    "returned from the prior season. Higher RSS means more continuity. "
+                    "<span style='color:#22c55e;font-weight:600;'>Green</span> dots made the postseason.</div>",
+                    unsafe_allow_html=True,
                 )
 
-            st.markdown(
-                "<div style='background:#0d1e35;border-left:3px solid #3b6fd4;border-radius:0 8px 8px 0;"
-                "padding:0.7rem 1rem;margin-top:0.6rem;font-size:0.82rem;color:#93b8d8;line-height:1.6;'>"
-                "<b style='color:#60a5fa;'>Research context:</b> Over the past decade, World Series "
-                "champions averaged 8th in payroll — efficient roster construction matters more than "
-                "total spend once you reach the postseason.</div>",
-                unsafe_allow_html=True,
-            )
+                _comb_path_4 = _data_url("data/mlb_combined_2021_2025.csv")
+                try:
+                    _comb_4 = _read_csv(_comb_path_4, low_memory=False)
+                    _comb_4.columns = [c.strip() for c in _comb_4.columns]
+                    for _nc in ["Year", "PA", "IP", "WAR_Total"]:
+                        if _nc in _comb_4.columns:
+                            _comb_4[_nc] = pd.to_numeric(_comb_4[_nc], errors="coerce")
 
-    # ══════════════════════════════════════════════════════════════════════
-    # Feature 2 — Incremental Spending Impact
-    # ══════════════════════════════════════════════════════════════════════
-    st.markdown("---")
-    st.markdown("### Marginal Spending Impact")
-    st.markdown(
-        "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
-        "Not all payroll dollars spent are equal. The first $100M spent gains the most wins per $ "
-        "than the next tier $244M to $300M+. Based on this nonlinear relationship, each bar below "
-        "shows how many additional wins a team can expect per $10M spent within that spending tier, "
-        "based on 2021–2025 data. "
-        "<span style='color:#22c55e;font-weight:600;'>Green</span> = strong return, "
-        "<span style='color:#f59e0b;font-weight:600;'>amber</span> = moderate, "
-        "<span style='color:#ef4444;font-weight:600;'>red</span> = diminishing returns.</div>",
-        unsafe_allow_html=True,
-    )
+                    _rss_thresh = st.slider("Min PA (hitters) / IP (pitchers)", 50, 300, 150,
+                                             key="v2_rss_min_pa")
 
-    if {"payroll_M", "Wins"}.issubset(detail_df.columns):
-        _f2 = detail_df.dropna(subset=["payroll_M", "Wins"]).copy()
-        _f2["payroll_M"] = pd.to_numeric(_f2["payroll_M"], errors="coerce")
-        _f2["Wins"]      = pd.to_numeric(_f2["Wins"], errors="coerce")
+                    _is_pit4 = _comb_4["Position"].isin(["SP", "RP", "P", "TWP"])
+                    _comb_q = _comb_4[
+                        (_is_pit4 & (_comb_4["IP"].fillna(0) >= _rss_thresh)) |
+                        (~_is_pit4 & (_comb_4["PA"].fillna(0) >= _rss_thresh))
+                    ].copy()
 
-        _TIERS = [
-            ("Budget ($0–100M)",       0,   100),
-            ("Mid-Market ($100–175M)", 100, 175),
-            ("Contender ($175–244M)",  175, 244),
-            ("Big Market ($244M+)",    244, 999),
-        ]
+                    _years4 = sorted(_comb_q["Year"].dropna().unique().astype(int))
+                    _rss_records = []
+                    for yr in _years4:
+                        if yr == min(_years4):
+                            continue
+                        for tm in _comb_q["Team"].unique():
+                            curr = set(_comb_q[(_comb_q["Year"] == yr) & (_comb_q["Team"] == tm)]["Player"])
+                            prev = set(_comb_q[(_comb_q["Year"] == yr - 1) & (_comb_q["Team"] == tm)]["Player"])
+                            if not curr:
+                                continue
+                            returning = curr & prev
+                            rss = len(returning) / len(curr) * 100
+                            _wins_row = detail_df[(detail_df["Year"] == yr) & (detail_df["Team"] == tm)]
+                            wins = float(_wins_row["Wins"].iloc[0]) if not _wins_row.empty and "Wins" in _wins_row.columns else None
+                            playoff = bool(_wins_row["in_playoffs"].iloc[0]) if not _wins_row.empty and "in_playoffs" in _wins_row.columns else False
+                            _rss_records.append({"Team": tm, "Year": yr, "RSS": round(rss, 1),
+                                                 "Wins": wins, "Playoff": playoff,
+                                                 "Returning": len(returning), "Total": len(curr)})
 
-        _slopes = []
-        for name, lo, hi in _TIERS:
-            tier_df = _f2[(_f2["payroll_M"] >= lo) & (_f2["payroll_M"] < hi)]
-            if len(tier_df) >= 5:
-                c = np.polyfit(tier_df["payroll_M"], tier_df["Wins"], 1)
-                wins_per_10m = c[0] * 10
+                    if _rss_records:
+                        _rss_df = pd.DataFrame(_rss_records).dropna(subset=["Wins"])
+
+                        if len(_rss_df) > 10:
+                            _rx = _rss_df["RSS"].values
+                            _ry = _rss_df["Wins"].values
+                            _rc = np.polyfit(_rx, _ry, 1)
+                            _rp = np.polyval(_rc, _rx)
+                            _rss_r2 = 1 - np.sum((_ry - _rp) ** 2) / max(np.sum((_ry - _ry.mean()) ** 2), 1e-9)
+
+                            _rss_colors = ["#22c55e" if p else "#4a687e" for p in _rss_df["Playoff"]]
+                            _rss_hover = _rss_df.apply(lambda r: (
+                                f"<b>{r['Team']}</b> {int(r['Year'])}<br>"
+                                + f"RSS: {r['RSS']:.1f}% · Wins: {int(r['Wins'])}<br>"
+                                + f"Returning: {int(r['Returning'])}/{int(r['Total'])}"
+                            ), axis=1)
+
+                            fig_rss = go.Figure()
+                            fig_rss.add_trace(go.Scatter(
+                                x=_rss_df["RSS"], y=_rss_df["Wins"], mode="markers",
+                                marker=dict(color=_rss_colors, size=8, opacity=0.8),
+                                text=_rss_hover, hovertemplate="%{text}<extra></extra>",
+                                name="Teams",
+                            ))
+                            _xr4 = np.linspace(_rx.min(), _rx.max(), 100)
+                            fig_rss.add_trace(go.Scatter(
+                                x=_xr4, y=np.polyval(_rc, _xr4), mode="lines",
+                                line=dict(color="#f4a261", width=2),
+                                name=f"OLS (R\u00b2={_rss_r2:.3f})",
+                            ))
+                            fig_rss.update_layout(**_pt(
+                                title="Roster Stability vs Win Total",
+                                xaxis=dict(title="Roster Stability Score (%)"),
+                                yaxis=dict(title="Wins"), height=440, showlegend=True,
+                                legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
+                                hoverlabel=dict(bgcolor="#0d1f38", bordercolor="#1e3a5f",
+                                                font=dict(color="#dbeafe", size=12)),
+                            ))
+                            _rss_col, _ = st.columns([3, 1])
+                            with _rss_col:
+                                st.plotly_chart(fig_rss, width="stretch")
+
+                            _med_rss = float(_rss_df["RSS"].median())
+                            _high = _rss_df[_rss_df["RSS"] >= _med_rss]
+                            _low  = _rss_df[_rss_df["RSS"] < _med_rss]
+                            if not _high.empty and not _low.empty:
+                                st.info(
+                                    f"Teams with RSS above {_med_rss:.0f}% won an average of "
+                                    f"{_high['Wins'].mean():.1f} games vs {_low['Wins'].mean():.1f} "
+                                    f"games for teams below that threshold."
+                                )
+                except Exception:
+                    st.caption("Could not load combined data for RSS analysis.")
             else:
-                wins_per_10m = 0
-            _slopes.append((name, round(wins_per_10m, 2)))
-
-        _sl_names  = [s[0] for s in _slopes]
-        _sl_vals   = [s[1] for s in _slopes]
-        _sl_colors = ["#22c55e" if v >= 1.0 else "#f59e0b" if v >= 0.3 else "#ef4444" for v in _sl_vals]
-
-        fig_f2 = go.Figure(go.Bar(
-            y=_sl_names, x=_sl_vals, orientation="h",
-            marker_color=_sl_colors,
-            text=[f"{v:+.2f} wins" for v in _sl_vals],
-            textposition="outside", textfont=dict(color="#dbeafe", size=10),
-            hovertemplate="%{y}: %{x:.2f} wins per $10M<extra></extra>",
-        ))
-        _xmax_f2 = max(abs(v) for v in _sl_vals) * 1.5 if _sl_vals else 3
-        fig_f2.update_layout(**_pt(
-            title="Marginal Wins per $10M by Spending Tier",
-            xaxis=dict(title="Wins per $10M spent",
-                       zeroline=True, zerolinecolor="#4a687e", zerolinewidth=1,
-                       range=[-_xmax_f2, _xmax_f2]),
-            yaxis=dict(autorange="reversed"),
-            height=300,
-            margin=dict(l=180, r=80, t=40, b=40),
-        ))
-        _f2_col, _ = st.columns([3, 1])
-        with _f2_col:
-            st.plotly_chart(fig_f2, width="stretch")
-
-        # 2B — Interactive slider
-        _spend_add = st.slider("Add spending ($M)", 0, 50, 10, step=5,
-                                key="v2_spend_slider")
-        if _spend_add > 0 and _slopes:
-            # Find user's current tier (assume mid-market as default)
-            _cur_tier_idx = 1
-            _cur_slope = _slopes[_cur_tier_idx][1]
-            _add_wins = _cur_slope * (_spend_add / 10)
-            st.markdown(
-                f"<div style='background:#0d1e35;border:1px solid #1e3250;border-radius:8px;"
-                f"padding:0.8rem 1rem;font-size:0.85rem;color:#d6e8f8;'>"
-                f"Adding <b>${_spend_add}M</b> at the <b>{_slopes[_cur_tier_idx][0]}</b> tier "
-                f"buys ~<b>{_add_wins:.1f}</b> additional wins "
-                f"(slope: {_cur_slope:.2f} wins/$10M)."
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-
-    # ══════════════════════════════════════════════════════════════════════
-    # Feature 4 — Roster Stability Score (RSS) vs Wins
-    # ══════════════════════════════════════════════════════════════════════
-    st.markdown("---")
-    st.markdown("### Roster Stability and Win Correlation")
-    st.markdown(
-        "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
-        "Roster Stability Score (RSS) measures what percentage of a team's qualifying players "
-        "returned from the prior season. Higher RSS means more continuity. "
-        "<span style='color:#22c55e;font-weight:600;'>Green</span> dots made the postseason.</div>",
-        unsafe_allow_html=True,
-    )
-
-    _comb_path_4 = _data_url("data/mlb_combined_2021_2025.csv")
-    try:
-        _comb_4 = _read_csv(_comb_path_4, low_memory=False)
-        _comb_4.columns = [c.strip() for c in _comb_4.columns]
-        for _nc in ["Year", "PA", "IP", "WAR_Total"]:
-            if _nc in _comb_4.columns:
-                _comb_4[_nc] = pd.to_numeric(_comb_4[_nc], errors="coerce")
-
-        _rss_thresh = st.slider("Min PA (hitters) / IP (pitchers)", 50, 300, 150,
-                                 key="v2_rss_min_pa")
-
-        _is_pit4 = _comb_4["Position"].isin(["SP", "RP", "P", "TWP"])
-        _comb_q = _comb_4[
-            (_is_pit4 & (_comb_4["IP"].fillna(0) >= _rss_thresh)) |
-            (~_is_pit4 & (_comb_4["PA"].fillna(0) >= _rss_thresh))
-        ].copy()
-
-        _years4 = sorted(_comb_q["Year"].dropna().unique().astype(int))
-        _rss_records = []
-        for yr in _years4:
-            if yr == min(_years4):
-                continue  # need prior year
-            for tm in _comb_q["Team"].unique():
-                curr = set(_comb_q[(_comb_q["Year"] == yr) & (_comb_q["Team"] == tm)]["Player"])
-                prev = set(_comb_q[(_comb_q["Year"] == yr - 1) & (_comb_q["Team"] == tm)]["Player"])
-                if not curr:
-                    continue
-                returning = curr & prev
-                rss = len(returning) / len(curr) * 100
-                # Get wins from detail_df
-                _wins_row = detail_df[(detail_df["Year"] == yr) & (detail_df["Team"] == tm)]
-                wins = float(_wins_row["Wins"].iloc[0]) if not _wins_row.empty and "Wins" in _wins_row.columns else None
-                playoff = bool(_wins_row["in_playoffs"].iloc[0]) if not _wins_row.empty and "in_playoffs" in _wins_row.columns else False
-                _rss_records.append({"Team": tm, "Year": yr, "RSS": round(rss, 1),
-                                     "Wins": wins, "Playoff": playoff,
-                                     "Returning": len(returning), "Total": len(curr)})
-
-        if _rss_records:
-            _rss_df = pd.DataFrame(_rss_records).dropna(subset=["Wins"])
-
-            if len(_rss_df) > 10:
-                _rx = _rss_df["RSS"].values
-                _ry = _rss_df["Wins"].values
-                _rc = np.polyfit(_rx, _ry, 1)
-                _rp = np.polyval(_rc, _rx)
-                _rss_r2 = 1 - np.sum((_ry - _rp) ** 2) / max(np.sum((_ry - _ry.mean()) ** 2), 1e-9)
-
-                _rss_colors = ["#22c55e" if p else "#4a687e" for p in _rss_df["Playoff"]]
-                _rss_hover = _rss_df.apply(lambda r: (
-                    f"<b>{r['Team']}</b> {int(r['Year'])}<br>"
-                    + f"RSS: {r['RSS']:.1f}% · Wins: {int(r['Wins'])}<br>"
-                    + f"Returning: {int(r['Returning'])}/{int(r['Total'])}"
-                ), axis=1)
-
-                fig_rss = go.Figure()
-                fig_rss.add_trace(go.Scatter(
-                    x=_rss_df["RSS"], y=_rss_df["Wins"], mode="markers",
-                    marker=dict(color=_rss_colors, size=8, opacity=0.8),
-                    text=_rss_hover, hovertemplate="%{text}<extra></extra>",
-                    name="Teams",
-                ))
-                _xr4 = np.linspace(_rx.min(), _rx.max(), 100)
-                fig_rss.add_trace(go.Scatter(
-                    x=_xr4, y=np.polyval(_rc, _xr4), mode="lines",
-                    line=dict(color="#f4a261", width=2),
-                    name=f"OLS (R²={_rss_r2:.3f})",
-                ))
-                fig_rss.update_layout(**_pt(
-                    title="Roster Stability vs Win Total",
-                    xaxis=dict(title="Roster Stability Score (%)"),
-                    yaxis=dict(title="Wins"), height=440, showlegend=True,
-                    legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
-                    hoverlabel=dict(bgcolor="#0d1f38", bordercolor="#1e3a5f",
-                                    font=dict(color="#dbeafe", size=12)),
-                ))
-                _rss_col, _ = st.columns([3, 1])
-                with _rss_col:
-                    st.plotly_chart(fig_rss, width="stretch")
-
-                # Auto insight
-                _med_rss = float(_rss_df["RSS"].median())
-                _high = _rss_df[_rss_df["RSS"] >= _med_rss]
-                _low  = _rss_df[_rss_df["RSS"] < _med_rss]
-                if not _high.empty and not _low.empty:
-                    st.info(
-                        f"Teams with RSS above {_med_rss:.0f}% won an average of "
-                        f"{_high['Wins'].mean():.1f} games vs {_low['Wins'].mean():.1f} "
-                        f"games for teams below that threshold."
-                    )
-    except Exception:
-        st.caption("Could not load combined data for RSS analysis.")
+                st.info("Not enough multi-year player data for stability analysis.")
+        except Exception as _ws_e:
+            st.warning(f"Could not compute stability data: {_ws_e}")
 
     _render_feedback_widget("rankings")
 
