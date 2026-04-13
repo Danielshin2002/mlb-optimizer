@@ -46,6 +46,27 @@ from src.team_mode    import (
 from src.depth_chart  import (
     get_depth_chart_dir,
 )
+from utils.constants import (
+    PAYROLL_TEAM_MAP as _PAYROLL_2026_TEAM_MAP_CONST,
+    CBT_TIERS as _CBT_TIERS_CONST,
+    POS_GROUP_MAP as _POS_GROUP_MAP_CONST,
+    ELIGIBLE_SLOTS_MAP as _ELIGIBLE_SLOTS_MAP_CONST,
+    OPTIONAL_SLOTS as _OPTIONAL_SLOTS_CONST,
+    ROSTER_TEMPLATE as _ROSTER_TEMPLATE_CONST,
+    PG_CHART_COLORS as _PG_CHART_COLORS_CONST,
+    ABBR_TO_FULL as _ABBR_TO_FULL_CONST,
+    TEAM_CITIES as _TEAM_CITIES_CONST,
+    TEAM_COLORS as _TEAM_COLORS_CONST,
+    LOGO_FILE_NAMES as _LOGO_FILE_NAMES_CONST,
+    MLB_TEAM_ID_MAP as _MLB_TEAM_ID_MAP_CONST,
+    AL_DIVISIONS, NL_DIVISIONS,
+    REPLACEMENT_LEVEL_WINS,
+    FWAR_CONTENDER_FLOOR,
+    GOOGLE_SHEET_WEBHOOK,
+    STAGE_DISPLAY_MAP,
+    STAGE_COLORS as STAGE_COLORS_CONST,
+    STAGE_BG_COLORS,
+)
 
 # ---------------------------------------------------------------------------
 # Page config
