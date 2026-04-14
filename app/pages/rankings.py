@@ -26,6 +26,28 @@ from utils.data_loading import (
 )
 
 
+_STAGE_COLORS = {"Pre-Arb": "#5dc9a5", "Arb": "#ef9f27", "FA": "#97c459"}
+_STAGE_LABELS = {"Pre-Arb": "Pre-Arbitration", "Arb": "Arbitration", "FA": "Free Agent"}
+
+
+def _stage_card(stage_key: str, big_val: str, sub_text: str, unit: str = ""):
+    """Render a stage summary card with accent border."""
+    color = _STAGE_COLORS.get(stage_key, "#4a687e")
+    label = _STAGE_LABELS.get(stage_key, stage_key)
+    return (
+        f"<div style='background:#1c2a42;border:1px solid #1e3050;"
+        f"border-left:3px solid {color};border-radius:8px;"
+        f"padding:0.7rem 0.9rem;margin-bottom:0.5rem;text-align:center;'>"
+        f"<div style='font-size:0.7rem;color:#93b8d8;font-weight:600;"
+        f"letter-spacing:0.05em;'>{label}</div>"
+        f"<div style='font-size:1.4rem;font-weight:800;color:{color};"
+        f"margin:0.2rem 0;'>{big_val}</div>"
+        f"<div style='font-size:0.68rem;color:#7a9ebc;'>{unit}</div>"
+        f"<div style='font-size:0.65rem;color:#5a7a94;margin-top:0.15rem;'>{sub_text}</div>"
+        f"</div>"
+    )
+
+
 def render(*_args, **_kwargs):
     """Rankings page entry point."""
 
@@ -46,13 +68,13 @@ def render(*_args, **_kwargs):
   padding:0.8rem 1rem;text-align:center;min-height:120px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   transition:border-color 0.2s,box-shadow 0.2s;}
-.rk-answer:hover{border-color:#f59e0b;box-shadow:0 0 10px rgba(245,158,11,0.25);}
+.rk-answer:hover{border-color:#2a4060;box-shadow:0 0 8px rgba(93,202,165,0.1);}
 .rk-answer .rk-q{font-size:0.72rem;color:#93b8d8;
   letter-spacing:0.05em;margin-bottom:0.2rem;font-weight:600;}
 .rk-answer .rk-team{font-size:1.25rem;font-weight:800;color:#d6e8f8;line-height:1.1;}
 .rk-answer .rk-val{font-size:0.82rem;color:#93b8d8;margin-top:0.2rem;}
 .rk-answer .rk-icon{font-size:1.3rem;margin-bottom:0.15rem;line-height:1;}
-.rk-box-sel{border-color:#f59e0b !important;box-shadow:0 0 12px rgba(245,158,11,0.3) !important;}
+.rk-box-sel{border:2px solid #5dc9a5 !important;box-shadow:0 0 15px rgba(93,202,165,0.3),0 0 30px rgba(93,202,165,0.15) !important;}
 .rk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.7rem;margin-bottom:0.7rem;}
 .rk-grid a{text-decoration:none;color:inherit;}
 @keyframes gentle-pulse{0%,100%{opacity:0.4;}50%{opacity:1;}}
@@ -161,15 +183,19 @@ def render(*_args, **_kwargs):
         "top_overperformer": "winperf", "most_wins": "winperf",
         "best_dpw": "salary",
         "top_fwar": "fwar",
-        "p_top_fwar": "player_rankings",
+        "p_top_fwar": "fwar",
         "p_contract_val": "contract_value",
         "p_stability": "stability",
-        "best_marginal": "marginal",
-        "top_rss": "rss",
+        "best_marginal": "salary",
         "fwar_wins_link": "fwar",
+        "eff_playoffs": "playoff_success",
+        "fwar_cost": "fwar_cost",
+        "best_position": "position_value",
     }
     _TAB_ORDER = [
-        "efficiency", "fwar", "salary", "winperf", "contract_value", "stability",
+        "efficiency", "fwar", "salary", "winperf",
+        "contract_value", "stability",
+        "playoff_success", "fwar_cost", "position_value",
     ]
     if "rk_active_tab" not in st.session_state:
         st.session_state["rk_active_tab"] = "efficiency"
@@ -248,37 +274,6 @@ def render(*_args, **_kwargs):
                     _best_marginal_name = _tn
                     _best_marginal_val = f"+{_tw10:.2f} wins/$10M"
 
-    # Top Roster Stability — best RSS team for the selected year
-    _top_rss_team = "N/A"
-    _top_rss_val = ""
-    _rss_records_box = []
-    try:
-        if _paw_df is not None:
-            _comb_box = _paw_df.copy()
-            for _nc in ["PA", "IP"]:
-                if _nc in _comb_box.columns:
-                    _comb_box[_nc] = pd.to_numeric(_comb_box[_nc], errors="coerce")
-            _is_pit_box = _comb_box["Position"].isin(["SP", "RP", "P", "TWP"])
-            _comb_q_box = _comb_box[
-                (_is_pit_box & (_comb_box["IP"].fillna(0) >= 150)) |
-                (~_is_pit_box & (_comb_box["PA"].fillna(0) >= 150))
-            ].copy()
-            _yrs_box = sorted(_comb_q_box["Year"].dropna().unique().astype(int))
-            if sel_year in _yrs_box and sel_year > min(_yrs_box):
-                for _tm in _comb_q_box["Team"].unique():
-                    _curr = set(_comb_q_box[(_comb_q_box["Year"] == sel_year) & (_comb_q_box["Team"] == _tm)]["Player"])
-                    _prev = set(_comb_q_box[(_comb_q_box["Year"] == sel_year - 1) & (_comb_q_box["Team"] == _tm)]["Player"])
-                    if _curr:
-                        _rss_val = len(_curr & _prev) / len(_curr) * 100
-                        _rss_records_box.append({"Team": _tm, "RSS": round(_rss_val, 1)})
-            if _rss_records_box:
-                _rss_box_df = pd.DataFrame(_rss_records_box).sort_values("RSS", ascending=False)
-                _top_rss_row = _rss_box_df.iloc[0]
-                _top_rss_team = str(_top_rss_row["Team"])
-                _top_rss_val = f"{_top_rss_row['RSS']:.1f}% returning"
-    except Exception:
-        pass
-
     # Strongest fWAR-Wins Link — R² value
     _fwar_r2_str = ""
     _fwar_r2 = 0.0
@@ -296,6 +291,37 @@ def render(*_args, **_kwargs):
             _ss_tot_p = np.sum((_yp - _yp.mean()) ** 2)
             _fwar_r2 = 1 - (_ss_res_p / _ss_tot_p) if _ss_tot_p > 0 else 0
             _fwar_r2_str = f"R\u00b2 = {_fwar_r2:.3f}"
+
+    # ── Compute new insight box values ──────────────────────────────────────────
+    # 1. Efficiency → Playoffs rate
+    _eff_playoff_str = ""
+    if {"dollar_gap_M", "in_playoffs"}.issubset(detail_df.columns):
+        _ep_df = detail_df.dropna(subset=["dollar_gap_M"])
+        _ep_df["dollar_gap_M"] = pd.to_numeric(_ep_df["dollar_gap_M"], errors="coerce")
+        _ep_eff = _ep_df.nsmallest(len(_ep_df) // 3, "dollar_gap_M")
+        _ep_ineff = _ep_df.nlargest(len(_ep_df) // 3, "dollar_gap_M")
+        _ep_eff_rate = _ep_eff["in_playoffs"].mean() * 100 if not _ep_eff.empty else 0
+        _ep_ineff_rate = _ep_ineff["in_playoffs"].mean() * 100 if not _ep_ineff.empty else 0
+        _eff_playoff_str = f"{_ep_eff_rate:.0f}% vs {_ep_ineff_rate:.0f}%"
+
+    # 2. League avg $/fWAR
+    _avg_dpw_str = ""
+    if not yr_df.empty and "DPW" in yr_df.columns:
+        _avg_dpw = yr_df["DPW"].median()
+        _avg_dpw_str = f"${_avg_dpw:.1f}M per fWAR"
+
+    # 3. Most efficient position
+    _best_pos_name = ""
+    _best_pos_val = ""
+    if _paw_df is not None and not _paw_25.empty:
+        _pos_eff = _paw_25[(_paw_25["Salary_M"] > 0.5) & (_paw_25["WAR_Total"] > 0)].copy()
+        if not _pos_eff.empty:
+            _pos_eff["_wpm"] = _pos_eff["WAR_Total"] / _pos_eff["Salary_M"].clip(lower=0.1)
+            _pos_avg = _pos_eff.groupby("Position")["_wpm"].mean()
+            _pos_avg = _pos_avg[_pos_avg.index.isin(["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH", "SP", "RP"])]
+            if not _pos_avg.empty:
+                _best_pos_name = _pos_avg.idxmax()
+                _best_pos_val = f"{_pos_avg.max():.2f} fWAR/$M"
 
     # ── Build box HTML helper ─────────────────────────────────────────────────
     def _box_html(box_id, label, team_name, val_str, logo_url="", img_html=""):
@@ -380,14 +406,27 @@ def render(*_args, **_kwargs):
     if _p_count > 0:
         st.markdown(_p_grid_html, unsafe_allow_html=True)
 
-    # ── Row 4: New analysis boxes ─────────────────────────────────────────────
+    # ── Row 4: Analysis boxes ────────────────────────────────────────────────
     _r4_html = "<div class='rk-grid'>"
     _r4_html += _box_html("best_marginal", "BEST MARGINAL SPENDING", _best_marginal_name, _best_marginal_val)
-    _top_rss_logo = team_logo_url(_top_rss_team) if _top_rss_team != "N/A" else ""
-    _r4_html += _box_html("top_rss", "TOP ROSTER STABILITY", _top_rss_team, _top_rss_val, logo_url=_top_rss_logo)
     _r4_html += _box_html("fwar_wins_link", "STRONGEST fWAR-WINS LINK", "All Teams", _fwar_r2_str)
+    _r4_html += _box_html("eff_playoffs", "EFFICIENCY → PLAYOFFS?",
+                           "Efficient vs Inefficient", _eff_playoff_str,
+                           img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>📊</div>")
     _r4_html += "</div>"
     st.markdown(_r4_html, unsafe_allow_html=True)
+
+    # ── Row 5: Insight boxes ──────────────────────────────────────────────────
+    _r5_html = "<div class='rk-grid'>"
+    _r5_html += _box_html("fwar_cost", "HOW MUCH DOES 1 fWAR COST?",
+                           f"{sel_year} League", _avg_dpw_str,
+                           img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>💵</div>")
+    _r5_html += _box_html("best_position", "MOST EFFICIENT POSITION",
+                           _best_pos_name, _best_pos_val,
+                           img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>🏟️</div>")
+    _r5_html += "<div></div>"  # empty third slot
+    _r5_html += "</div>"
+    st.markdown(_r5_html, unsafe_allow_html=True)
 
     # Animated hint (disappears after first click)
     if not st.session_state.get("rk_box_clicked"):
@@ -425,9 +464,10 @@ def render(*_args, **_kwargs):
 
     # ── Tabs ─────────────────────────────────────────────────────────────────
     _tab_default = _TAB_ORDER.index(_act_tab) if _act_tab in _TAB_ORDER else 0
-    rt1, rt2, rt3, rt4, rt5, rt6 = st.tabs([
+    rt1, rt2, rt3, rt4, rt5, rt6, rt7, rt8, rt9 = st.tabs([
         "\U0001f3c6 Efficiency", "\u2b50 fWAR", "\U0001f4b0 Salary", "\U0001f4c8 Win Performance",
         "\U0001f48e Contract Value", "\U0001f512 Stability",
+        "📊 Playoff Success", "💵 fWAR Cost", "🏟️ Position Value",
     ])
 
     # ── Tab 1: Efficiency ─────────────────────────────────────────────────────
@@ -904,10 +944,16 @@ def render(*_args, **_kwargs):
 
     # ── Tab 5: Contract Value ─────────────────────────────────────────────────
     with rt5:
+        # Explainer
         st.markdown(
-            "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;'>"
-            "Player contract value measured as fWAR per $M of salary. Higher values mean "
-            "more on-field production per dollar spent. Players earning &gt;$1M included.</div>",
+            "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;line-height:1.6;'>"
+            "<b style='color:#d6e8f8;'>Contract Value</b> measures how much on-field production "
+            "a player delivers per dollar of salary. <b>Higher is better</b> — it means the player "
+            "produces more fWAR for every million spent. "
+            "<span style='color:#5dc9a5;'>Pre-Arb</span> players typically offer the best value "
+            "because they earn near league minimum."
+            "<br><span style='font-size:0.75rem;color:#5a7a94;'>Formula: "
+            "<code style='color:#60a5fa;'>Contract Value = fWAR ÷ Salary ($M)</code></span></div>",
             unsafe_allow_html=True,
         )
         try:
@@ -919,43 +965,79 @@ def render(*_args, **_kwargs):
                 _cv_left, _cv_right = st.columns([7, 3])
                 with _cv_left:
                     if not _cv_top.empty:
-                        _cv_vals = _cv_top["fWAR_per_M"].tolist()
-                        _cv_names = _cv_top["Player"].tolist()
-                        _cv_colors = ["#22c55e" if v >= 1.0 else "#4873b8" if v >= 0.5 else "#4a687e" for v in _cv_vals]
+                        _cv_bar_colors = [
+                            _STAGE_COLORS.get(s, "#4a687e")
+                            for s in _cv_top.get("Stage_Clean", pd.Series([""] * len(_cv_top)))
+                        ]
+                        _cv_labels = [
+                            f"{p} ({t})" for p, t in zip(_cv_top["Player"], _cv_top["Team"])
+                        ]
                         fig_cv = go.Figure(go.Bar(
-                            y=_cv_names, x=_cv_vals, orientation="h",
-                            marker=dict(color=_cv_colors, line=dict(width=0)),
-                            text=[f"{v:.2f}" for v in _cv_vals],
+                            y=_cv_labels, x=_cv_top["fWAR_per_M"].tolist(), orientation="h",
+                            marker=dict(color=_cv_bar_colors, line=dict(width=0)),
+                            text=[f"{v:.2f}" for v in _cv_top["fWAR_per_M"]],
                             textposition="outside",
                             textfont=dict(color="#d6e8f8", size=9),
                             hovertemplate="%{y}: %{x:.2f} fWAR/$M<extra></extra>",
                         ))
                         fig_cv.update_layout(**_pt(
-                            title=f"{sel_year} \u2014 Top 15 Players by fWAR/$M",
+                            title=f"{sel_year} — Top 15 Players by Contract Value (fWAR/$M)",
                             xaxis=dict(title="fWAR per $M"),
                             yaxis=dict(autorange="reversed"),
-                            height=max(340, len(_cv_top) * 28),
-                            margin=dict(l=120, r=80, t=42, b=30),
+                            height=max(380, len(_cv_top) * 30),
+                            margin=dict(l=160, r=80, t=42, b=30),
                         ))
                         st.plotly_chart(fig_cv, use_container_width=True, config={"displayModeBar": False})
                 with _cv_right:
-                    # Avg fWAR/$M by contract stage
                     if "Stage_Clean" in _cv_df.columns:
-                        _stage_avg = _cv_df.groupby("Stage_Clean")["fWAR_per_M"].mean().round(2)
-                        _stage_map = {"Pre-Arb": "Pre-Arb", "Arb": "Arbitration", "FA": "Free Agent"}
-                        for _stg_key in ["Pre-Arb", "Arb", "FA"]:
-                            _stg_val = _stage_avg.get(_stg_key, 0)
-                            _stg_label = _stage_map.get(_stg_key, _stg_key)
-                            _stg_color = "#22c55e" if _stg_val >= 0.8 else "#f59e0b" if _stg_val >= 0.4 else "#ef4444"
+                        for _stg_key in ["FA", "Arb", "Pre-Arb"]:
+                            _stg_sub = _cv_df[_cv_df["Stage_Clean"] == _stg_key]
+                            _stg_val = _stg_sub["fWAR_per_M"].mean() if not _stg_sub.empty else 0
+                            _stg_best = _stg_sub.sort_values("fWAR_per_M", ascending=False).iloc[0] if not _stg_sub.empty else None
+                            _best_txt = f"Best: {_stg_best['Player']} — {_stg_best['fWAR_per_M']:.2f}" if _stg_best is not None else ""
                             st.markdown(
-                                f"<div class='rk-answer' style='min-height:90px;margin-bottom:0.5rem;'>"
-                                f"<div class='rk-q'>{_stg_label}</div>"
-                                f"<div class='rk-team' style='color:{_stg_color};'>{_stg_val:.2f}</div>"
-                                f"<div class='rk-val'>avg fWAR/$M</div></div>",
+                                _stage_card(_stg_key, f"{_stg_val:.2f}", _best_txt, "avg fWAR/$M"),
                                 unsafe_allow_html=True,
                             )
-                    else:
-                        st.caption("Stage data not available for breakdown.")
+
+                # Historical line plot by stage
+                st.markdown("---")
+                st.markdown("##### Average Contract Value by Career Stage (2021–2025)")
+                _cv_all = _paw_df[_paw_df["Salary_M"] > 1.0].copy()
+                _cv_all["fWAR_per_M"] = (_cv_all["WAR_Total"] / _cv_all["Salary_M"].clip(lower=0.1)).round(3)
+                _cv_hist = _cv_all.groupby(["Year", "Stage_Clean"])["fWAR_per_M"].mean().reset_index()
+
+                fig_cv_hist = go.Figure()
+                for _sk in ["Pre-Arb", "Arb", "FA"]:
+                    _sk_df = _cv_hist[_cv_hist["Stage_Clean"] == _sk].sort_values("Year")
+                    if not _sk_df.empty:
+                        fig_cv_hist.add_trace(go.Scatter(
+                            x=_sk_df["Year"].astype(int), y=_sk_df["fWAR_per_M"],
+                            mode="lines+markers", name=_STAGE_LABELS[_sk],
+                            line=dict(color=_STAGE_COLORS[_sk], width=2),
+                            marker=dict(size=7),
+                        ))
+                fig_cv_hist.update_layout(**_pt(
+                    xaxis=dict(title="Season", dtick=1),
+                    yaxis=dict(title="Avg fWAR/$M"),
+                    height=350, showlegend=True,
+                    legend=dict(orientation="h", y=1.05, x=0.5, xanchor="center"),
+                    margin=dict(l=50, r=30, t=30, b=40),
+                ))
+                _cv_hist_col, _ = st.columns([3, 1])
+                with _cv_hist_col:
+                    st.plotly_chart(fig_cv_hist, use_container_width=True, config={"displayModeBar": False})
+
+                # PPEL reference
+                with st.expander("📐 PPEL Formula Reference", expanded=False):
+                    st.markdown(
+                        "The **Pay-to-Performance Efficiency Line (PPEL)** is the league-wide regression "
+                        "of salary vs fWAR. Players above the line deliver more value than their salary "
+                        "predicts; players below it are overpaid relative to production.\n\n"
+                        "- **Contract Value** = fWAR ÷ Salary ($M) — single-season snapshot\n"
+                        "- **PPR** (Pay-Performance Ratio) = Σ actual fWAR across contract years ÷ total contract $M — "
+                        "multi-year view of whether the full contract delivered value"
+                    )
             else:
                 st.info("Player data not available for contract value analysis.")
         except Exception as _cv_e:
@@ -963,167 +1045,429 @@ def render(*_args, **_kwargs):
 
     # ── Tab 6: Stability ──────────────────────────────────────────────────────
     with rt6:
+        # Explainer
         st.markdown(
-            "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;'>"
-            "WAR Stability Rating (WSR) measures how consistently a player produces fWAR across "
-            "seasons. Calculated as mean fWAR / (1 + std dev). Players with 3+ seasons included.</div>",
+            "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;line-height:1.6;'>"
+            "<b style='color:#d6e8f8;'>WAR Stability Rating (WSR)</b> measures how consistently "
+            "a player produces fWAR year over year. <b>Higher is better</b> — a high WSR means "
+            "you can count on reliable production, not a one-year outlier."
+            "<br><span style='font-size:0.75rem;color:#5a7a94;'>Formula: "
+            "<code style='color:#60a5fa;'>WSR = Mean fWAR ÷ (1 + Std Dev fWAR)</code> · "
+            "Players with 3+ seasons included.</span></div>",
             unsafe_allow_html=True,
         )
         try:
-            if not _wsr_grp.empty:
-                _wsr_top = _wsr_grp.sort_values("WSR", ascending=False).head(15)
+            if _paw_df is not None and not _wsr_grp.empty:
+                # Controls
+                _, _, _ws_c1, _ws_c2 = st.columns([4, 2, 2, 2])
+                with _ws_c1:
+                    _ws_n = st.selectbox("# Counted", [5, 10, 15, 25], index=2, key="ws_n_count")
+                with _ws_c2:
+                    _ws_yr_opt = st.selectbox("Years", ["5 yr (2021–2025)", "3 yr (2023–2025)"], key="ws_yr_range")
+                _ws_min_yr = 2023 if "3 yr" in _ws_yr_opt else 2021
+
+                # Recompute WSR with selected year range
+                _ws_paw = _paw_df[_paw_df["Year"] >= _ws_min_yr].dropna(subset=["WAR_Total"])
+                _ws_grp2 = _ws_paw.groupby("Player").agg(
+                    _mean=("WAR_Total", "mean"), _std=("WAR_Total", "std"),
+                    _n=("Year", "nunique"), Team=("Team", "last"),
+                    Stage_Clean=("Stage_Clean", "last"),
+                ).reset_index()
+                _min_seasons = 3 if _ws_min_yr == 2021 else 2
+                _ws_grp2 = _ws_grp2[_ws_grp2["_n"] >= _min_seasons].copy()
+                _ws_grp2["_std"] = _ws_grp2["_std"].fillna(0)
+                _ws_grp2["WSR"] = (_ws_grp2["_mean"] / (1 + _ws_grp2["_std"])).round(2)
+                _wsr_top2 = _ws_grp2.sort_values("WSR", ascending=False).head(_ws_n)
 
                 _ws_left, _ws_right = st.columns([7, 3])
                 with _ws_left:
-                    _ws_vals = _wsr_top["WSR"].tolist()
-                    _ws_names = _wsr_top["Player"].tolist()
-                    _ws_colors = ["#22c55e" if v >= 3.0 else "#4873b8" if v >= 1.5 else "#4a687e" for v in _ws_vals]
-                    fig_ws = go.Figure(go.Bar(
-                        y=_ws_names, x=_ws_vals, orientation="h",
-                        marker=dict(color=_ws_colors, line=dict(width=0)),
-                        text=[f"{v:.2f}" for v in _ws_vals],
-                        textposition="outside",
-                        textfont=dict(color="#d6e8f8", size=9),
-                        hovertemplate="%{y}: %{x:.2f} WSR<extra></extra>",
-                    ))
+                    # fWAR over time for top N players
+                    _ws_players = _wsr_top2["Player"].tolist()
+                    _ws_ts = _ws_paw[_ws_paw["Player"].isin(_ws_players)].copy()
+                    fig_ws = go.Figure()
+                    for _, _row in _wsr_top2.iterrows():
+                        _p = _row["Player"]
+                        _pdata = _ws_ts[_ws_ts["Player"] == _p].sort_values("Year")
+                        _stg = str(_row.get("Stage_Clean", ""))
+                        _clr = _STAGE_COLORS.get(_stg, "#4a687e")
+                        fig_ws.add_trace(go.Scatter(
+                            x=_pdata["Year"].astype(int), y=_pdata["WAR_Total"],
+                            mode="lines+markers", name=_p,
+                            line=dict(color=_clr, width=2), marker=dict(size=6),
+                            hovertemplate=f"<b>{_p}</b> ({_row['Team']})<br>"
+                                          f"Year: %{{x}}<br>fWAR: %{{y:.1f}}<extra></extra>",
+                        ))
                     fig_ws.update_layout(**_pt(
-                        title="Top 15 Players by WAR Stability Rating (WSR)",
-                        xaxis=dict(title="WSR (mean fWAR / (1 + std))"),
-                        yaxis=dict(autorange="reversed"),
-                        height=max(340, len(_wsr_top) * 28),
-                        margin=dict(l=120, r=80, t=42, b=30),
+                        title=f"fWAR Stability — Top {_ws_n} Players",
+                        xaxis=dict(title="Season", dtick=1),
+                        yaxis=dict(title="fWAR"),
+                        height=420, showlegend=True,
+                        legend=dict(font=dict(size=9), y=0.5),
+                        margin=dict(l=50, r=10, t=40, b=40),
                     ))
                     st.plotly_chart(fig_ws, use_container_width=True, config={"displayModeBar": False})
                 with _ws_right:
-                    # Avg WSR by contract stage
-                    if _paw_df is not None and "Stage_Clean" in _paw_df.columns:
-                        _paw_stg = _paw_df.dropna(subset=["WAR_Total"])
-                        _stg_wsr = _paw_stg.groupby(["Player", "Stage_Clean"]).agg(
-                            _mean=("WAR_Total", "mean"), _std=("WAR_Total", "std"),
-                            _n=("Year", "nunique"),
-                        ).reset_index()
-                        _stg_wsr = _stg_wsr[_stg_wsr["_n"] >= 2].copy()
-                        _stg_wsr["_std"] = _stg_wsr["_std"].fillna(0)
-                        _stg_wsr["WSR"] = (_stg_wsr["_mean"] / (1 + _stg_wsr["_std"])).round(2)
-                        _stg_avg_wsr = _stg_wsr.groupby("Stage_Clean")["WSR"].mean().round(2)
-                        _stage_map = {"Pre-Arb": "Pre-Arb", "Arb": "Arbitration", "FA": "Free Agent"}
-                        for _stg_key in ["Pre-Arb", "Arb", "FA"]:
-                            _stg_val = _stg_avg_wsr.get(_stg_key, 0)
-                            _stg_label = _stage_map.get(_stg_key, _stg_key)
-                            _stg_color = "#22c55e" if _stg_val >= 1.5 else "#f59e0b" if _stg_val >= 0.8 else "#ef4444"
-                            st.markdown(
-                                f"<div class='rk-answer' style='min-height:90px;margin-bottom:0.5rem;'>"
-                                f"<div class='rk-q'>{_stg_label}</div>"
-                                f"<div class='rk-team' style='color:{_stg_color};'>{_stg_val:.2f}</div>"
-                                f"<div class='rk-val'>avg WSR</div></div>",
-                                unsafe_allow_html=True,
-                            )
-                    else:
-                        st.caption("Stage data not available for breakdown.")
+                    for _stg_key in ["FA", "Arb", "Pre-Arb"]:
+                        _stg_sub = _ws_grp2[_ws_grp2["Stage_Clean"] == _stg_key]
+                        _stg_val = _stg_sub["WSR"].mean() if not _stg_sub.empty else 0
+                        _stg_best = _stg_sub.sort_values("WSR", ascending=False).iloc[0] if not _stg_sub.empty else None
+                        _best_txt = f"Best: {_stg_best['Player']} — {_stg_best['WSR']:.2f}" if _stg_best is not None else ""
+                        st.markdown(
+                            _stage_card(_stg_key, f"{_stg_val:.2f}", _best_txt, "avg WSR"),
+                            unsafe_allow_html=True,
+                        )
 
-                # RSS section
+                # ── Who's Trending Up ─────────────────────────────────────────
                 st.markdown("---")
-                st.markdown("### Roster Stability and Win Correlation")
+                st.markdown("##### Who's Trending Up")
                 st.markdown(
-                    "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.8rem;line-height:1.6;'>"
-                    "Roster Stability Score (RSS) measures what percentage of a team's qualifying players "
-                    "returned from the prior season. Higher RSS means more continuity. "
-                    "<span style='color:#22c55e;font-weight:600;'>Green</span> dots made the postseason.</div>",
+                    "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;'>"
+                    "Players whose fWAR has been increasing over the selected time window "
+                    "(positive slope). Steeper lines = faster improvement.</div>",
                     unsafe_allow_html=True,
                 )
 
-                _comb_path_4 = data_url("data/mlb_combined_2021_2025.csv")
-                try:
-                    _comb_4 = read_csv(_comb_path_4, low_memory=False)
-                    _comb_4.columns = [c.strip() for c in _comb_4.columns]
-                    for _nc in ["Year", "PA", "IP", "WAR_Total"]:
-                        if _nc in _comb_4.columns:
-                            _comb_4[_nc] = pd.to_numeric(_comb_4[_nc], errors="coerce")
+                # Calculate per-player fWAR trend (slope)
+                _trend_players = _ws_paw.groupby("Player").filter(lambda g: len(g) >= _min_seasons)
+                _slopes_list = []
+                for _p, _grp in _trend_players.groupby("Player"):
+                    if len(_grp) >= _min_seasons:
+                        _yrs = _grp["Year"].values.astype(float)
+                        _wars = _grp["WAR_Total"].values.astype(float)
+                        _slope = np.polyfit(_yrs, _wars, 1)[0]
+                        _last = _grp.sort_values("Year").iloc[-1]
+                        _slopes_list.append({
+                            "Player": _p, "slope": round(_slope, 3),
+                            "Team": _last["Team"],
+                            "Stage_Clean": _last.get("Stage_Clean", ""),
+                            "last_fWAR": round(_last["WAR_Total"], 1),
+                        })
+                if _slopes_list:
+                    _slope_df = pd.DataFrame(_slopes_list)
+                    _trending = _slope_df[_slope_df["slope"] > 0].sort_values("slope", ascending=False).head(_ws_n)
 
-                    _rss_thresh = st.slider("Min PA (hitters) / IP (pitchers)", 50, 300, 150,
-                                             key="v2_rss_min_pa")
-
-                    _is_pit4 = _comb_4["Position"].isin(["SP", "RP", "P", "TWP"])
-                    _comb_q = _comb_4[
-                        (_is_pit4 & (_comb_4["IP"].fillna(0) >= _rss_thresh)) |
-                        (~_is_pit4 & (_comb_4["PA"].fillna(0) >= _rss_thresh))
-                    ].copy()
-
-                    _years4 = sorted(_comb_q["Year"].dropna().unique().astype(int))
-                    _rss_records = []
-                    for yr in _years4:
-                        if yr == min(_years4):
-                            continue
-                        for tm in _comb_q["Team"].unique():
-                            curr = set(_comb_q[(_comb_q["Year"] == yr) & (_comb_q["Team"] == tm)]["Player"])
-                            prev = set(_comb_q[(_comb_q["Year"] == yr - 1) & (_comb_q["Team"] == tm)]["Player"])
-                            if not curr:
-                                continue
-                            returning = curr & prev
-                            rss = len(returning) / len(curr) * 100
-                            _wins_row = detail_df[(detail_df["Year"] == yr) & (detail_df["Team"] == tm)]
-                            wins = float(_wins_row["Wins"].iloc[0]) if not _wins_row.empty and "Wins" in _wins_row.columns else None
-                            playoff = bool(_wins_row["in_playoffs"].iloc[0]) if not _wins_row.empty and "in_playoffs" in _wins_row.columns else False
-                            _rss_records.append({"Team": tm, "Year": yr, "RSS": round(rss, 1),
-                                                 "Wins": wins, "Playoff": playoff,
-                                                 "Returning": len(returning), "Total": len(curr)})
-
-                    if _rss_records:
-                        _rss_df = pd.DataFrame(_rss_records).dropna(subset=["Wins"])
-
-                        if len(_rss_df) > 10:
-                            _rx = _rss_df["RSS"].values
-                            _ry = _rss_df["Wins"].values
-                            _rc = np.polyfit(_rx, _ry, 1)
-                            _rp = np.polyval(_rc, _rx)
-                            _rss_r2 = 1 - np.sum((_ry - _rp) ** 2) / max(np.sum((_ry - _ry.mean()) ** 2), 1e-9)
-
-                            _rss_colors = ["#22c55e" if p else "#4a687e" for p in _rss_df["Playoff"]]
-                            _rss_hover = _rss_df.apply(lambda r: (
-                                f"<b>{r['Team']}</b> {int(r['Year'])}<br>"
-                                + f"RSS: {r['RSS']:.1f}% \u00b7 Wins: {int(r['Wins'])}<br>"
-                                + f"Returning: {int(r['Returning'])}/{int(r['Total'])}"
-                            ), axis=1)
-
-                            fig_rss = go.Figure()
-                            fig_rss.add_trace(go.Scatter(
-                                x=_rss_df["RSS"], y=_rss_df["Wins"], mode="markers",
-                                marker=dict(color=_rss_colors, size=8, opacity=0.8),
-                                text=_rss_hover, hovertemplate="%{text}<extra></extra>",
-                                name="Teams",
+                    if not _trending.empty:
+                        _tu_left, _tu_right = st.columns([7, 3])
+                        with _tu_left:
+                            _tu_players = _trending["Player"].tolist()
+                            _tu_ts = _ws_paw[_ws_paw["Player"].isin(_tu_players)].copy()
+                            fig_tu = go.Figure()
+                            for _, _row in _trending.iterrows():
+                                _p = _row["Player"]
+                                _pdata = _tu_ts[_tu_ts["Player"] == _p].sort_values("Year")
+                                _clr = _STAGE_COLORS.get(str(_row.get("Stage_Clean", "")), "#4a687e")
+                                fig_tu.add_trace(go.Scatter(
+                                    x=_pdata["Year"].astype(int), y=_pdata["WAR_Total"],
+                                    mode="lines+markers", name=_p,
+                                    line=dict(color=_clr, width=2), marker=dict(size=6),
+                                    hovertemplate=f"<b>{_p}</b> ({_row['Team']})<br>"
+                                                  f"Year: %{{x}}<br>fWAR: %{{y:.1f}}<extra></extra>",
+                                ))
+                            fig_tu.update_layout(**_pt(
+                                title=f"Trending Up — Top {_ws_n} by fWAR Slope",
+                                xaxis=dict(title="Season", dtick=1),
+                                yaxis=dict(title="fWAR"),
+                                height=400, showlegend=True,
+                                legend=dict(font=dict(size=9), y=0.5),
+                                margin=dict(l=50, r=10, t=40, b=40),
                             ))
-                            _xr4 = np.linspace(_rx.min(), _rx.max(), 100)
-                            fig_rss.add_trace(go.Scatter(
-                                x=_xr4, y=np.polyval(_rc, _xr4), mode="lines",
-                                line=dict(color="#f4a261", width=2),
-                                name=f"OLS (R\u00b2={_rss_r2:.3f})",
-                            ))
-                            fig_rss.update_layout(**_pt(
-                                title="Roster Stability vs Win Total",
-                                xaxis=dict(title="Roster Stability Score (%)"),
-                                yaxis=dict(title="Wins"), height=440, showlegend=True,
-                                legend=dict(orientation="h", y=1.02, x=1, xanchor="right", yanchor="bottom"),
-                                hoverlabel=dict(bgcolor="#0d1f38", bordercolor="#1e3a5f",
-                                                font=dict(color="#dbeafe", size=12)),
-                            ))
-                            _rss_col, _ = st.columns([3, 1])
-                            with _rss_col:
-                                st.plotly_chart(fig_rss, width="stretch")
-
-                            _med_rss = float(_rss_df["RSS"].median())
-                            _high = _rss_df[_rss_df["RSS"] >= _med_rss]
-                            _low  = _rss_df[_rss_df["RSS"] < _med_rss]
-                            if not _high.empty and not _low.empty:
-                                st.info(
-                                    f"Teams with RSS above {_med_rss:.0f}% won an average of "
-                                    f"{_high['Wins'].mean():.1f} games vs {_low['Wins'].mean():.1f} "
-                                    f"games for teams below that threshold."
+                            st.plotly_chart(fig_tu, use_container_width=True, config={"displayModeBar": False})
+                        with _tu_right:
+                            for _stg_key in ["FA", "Arb", "Pre-Arb"]:
+                                _stg_sub = _trending[_trending["Stage_Clean"] == _stg_key]
+                                _stg_avg = _stg_sub["slope"].mean() if not _stg_sub.empty else 0
+                                _stg_best = _stg_sub.sort_values("slope", ascending=False).iloc[0] if not _stg_sub.empty else None
+                                _best_txt = f"Best: {_stg_best['Player']} — +{_stg_best['slope']:.2f}/yr" if _stg_best is not None else "—"
+                                st.markdown(
+                                    _stage_card(_stg_key, f"+{_stg_avg:.2f}", _best_txt, "avg fWAR slope/yr"),
+                                    unsafe_allow_html=True,
                                 )
-                except Exception:
-                    st.caption("Could not load combined data for RSS analysis.")
             else:
                 st.info("Not enough multi-year player data for stability analysis.")
         except Exception as _ws_e:
             st.warning(f"Could not compute stability data: {_ws_e}")
+
+    # ── Tab 7: Playoff Success ───────────────────────────────────────────────
+    with rt7:
+        st.markdown(
+            "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;line-height:1.6;'>"
+            "Do teams that spend efficiently actually win more in October? We compare playoff "
+            "appearance rates between the most and least efficient teams across 2021–2025.</div>",
+            unsafe_allow_html=True,
+        )
+        try:
+            if {"dollar_gap_M", "in_playoffs"}.issubset(detail_df.columns):
+                _ps_df = detail_df.dropna(subset=["dollar_gap_M"]).copy()
+                _ps_df["dollar_gap_M"] = pd.to_numeric(_ps_df["dollar_gap_M"], errors="coerce")
+                _n3 = max(1, len(_ps_df["Team"].unique()) // 3)
+
+                # Rank teams by avg efficiency
+                _ps_team = _ps_df.groupby("Team").agg(
+                    avg_gap=("dollar_gap_M", "mean"),
+                    playoff_apps=("in_playoffs", "sum"),
+                    seasons=("Year", "nunique"),
+                ).reset_index()
+                _ps_team["playoff_rate"] = (_ps_team["playoff_apps"] / _ps_team["seasons"] * 100).round(1)
+                _ps_team = _ps_team.sort_values("avg_gap")
+
+                _top_tier = _ps_team.head(_n3)
+                _mid_tier = _ps_team.iloc[_n3:2 * _n3]
+                _bot_tier = _ps_team.tail(_n3)
+
+                _ps_left, _ps_right = st.columns([7, 3])
+                with _ps_left:
+                    fig_ps = go.Figure()
+                    for _tier_name, _tier_df, _color in [
+                        ("Top Efficiency", _top_tier, "#22c55e"),
+                        ("Mid Efficiency", _mid_tier, "#f59e0b"),
+                        ("Low Efficiency", _bot_tier, "#ef4444"),
+                    ]:
+                        fig_ps.add_trace(go.Bar(
+                            x=_tier_df["Team"], y=_tier_df["playoff_rate"],
+                            name=_tier_name, marker_color=_color,
+                            text=[f"{v:.0f}%" for v in _tier_df["playoff_rate"]],
+                            textposition="outside", textfont=dict(size=9, color="#d6e8f8"),
+                            hovertemplate="%{x}: %{y:.0f}% playoff rate<extra></extra>",
+                        ))
+                    fig_ps.update_layout(**_pt(
+                        title="Playoff Appearance Rate by Efficiency Tier (2021–2025)",
+                        xaxis=dict(title="", tickangle=-45),
+                        yaxis=dict(title="Playoff Rate (%)", range=[0, 110]),
+                        height=420, showlegend=True, barmode="group",
+                        legend=dict(orientation="h", y=1.05, x=0.5, xanchor="center"),
+                        margin=dict(l=50, r=20, t=40, b=80),
+                    ))
+                    st.plotly_chart(fig_ps, use_container_width=True, config={"displayModeBar": False})
+                with _ps_right:
+                    for _label, _tier, _clr in [
+                        ("Top Tier", _top_tier, "#22c55e"),
+                        ("Mid Tier", _mid_tier, "#f59e0b"),
+                        ("Bottom Tier", _bot_tier, "#ef4444"),
+                    ]:
+                        _rate = _tier["playoff_rate"].mean()
+                        _apps = int(_tier["playoff_apps"].sum())
+                        st.markdown(
+                            f"<div style='background:#1c2a42;border:1px solid #1e3050;"
+                            f"border-left:3px solid {_clr};border-radius:8px;"
+                            f"padding:0.7rem 0.9rem;margin-bottom:0.5rem;text-align:center;'>"
+                            f"<div style='font-size:0.7rem;color:#93b8d8;font-weight:600;'>{_label} Efficiency</div>"
+                            f"<div style='font-size:1.4rem;font-weight:800;color:{_clr};margin:0.2rem 0;'>"
+                            f"{_rate:.0f}%</div>"
+                            f"<div style='font-size:0.68rem;color:#7a9ebc;'>playoff rate</div>"
+                            f"<div style='font-size:0.65rem;color:#5a7a94;'>{_apps} appearances over 5 yr</div>"
+                            f"</div>",
+                            unsafe_allow_html=True,
+                        )
+
+                # Historical trend
+                st.markdown("---")
+                st.markdown("##### Playoff Rate by Efficiency Tier Over Time")
+                _ps_yr_data = []
+                for yr in sorted(_ps_df["Year"].unique()):
+                    _yr_teams = _ps_df[_ps_df["Year"] == yr].copy()
+                    _yr_teams = _yr_teams.sort_values("dollar_gap_M")
+                    _n_t = max(1, len(_yr_teams) // 3)
+                    for _tname, _tslice in [("Top", _yr_teams.head(_n_t)),
+                                              ("Mid", _yr_teams.iloc[_n_t:2*_n_t]),
+                                              ("Bottom", _yr_teams.tail(_n_t))]:
+                        _ps_yr_data.append({
+                            "Year": int(yr), "Tier": _tname,
+                            "Rate": _tslice["in_playoffs"].mean() * 100,
+                        })
+                if _ps_yr_data:
+                    _ps_yr_df = pd.DataFrame(_ps_yr_data)
+                    _tier_colors = {"Top": "#22c55e", "Mid": "#f59e0b", "Bottom": "#ef4444"}
+                    fig_ps_hist = go.Figure()
+                    for _t in ["Top", "Mid", "Bottom"]:
+                        _td = _ps_yr_df[_ps_yr_df["Tier"] == _t].sort_values("Year")
+                        fig_ps_hist.add_trace(go.Scatter(
+                            x=_td["Year"], y=_td["Rate"], mode="lines+markers",
+                            name=f"{_t} Tier", line=dict(color=_tier_colors[_t], width=2),
+                            marker=dict(size=7),
+                        ))
+                    fig_ps_hist.update_layout(**_pt(
+                        xaxis=dict(title="Season", dtick=1),
+                        yaxis=dict(title="Playoff Rate (%)", range=[0, 100]),
+                        height=340, showlegend=True,
+                        legend=dict(orientation="h", y=1.05, x=0.5, xanchor="center"),
+                        margin=dict(l=50, r=30, t=30, b=40),
+                    ))
+                    _ps_h_col, _ = st.columns([3, 1])
+                    with _ps_h_col:
+                        st.plotly_chart(fig_ps_hist, use_container_width=True, config={"displayModeBar": False})
+        except Exception as _ps_e:
+            st.warning(f"Could not compute playoff success data: {_ps_e}")
+
+    # ── Tab 8: fWAR Cost ─────────────────────────────────────────────────────
+    with rt8:
+        st.markdown(
+            "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;line-height:1.6;'>"
+            "The market price of one win fluctuates each year. Here's what teams pay per fWAR "
+            "across career stages — Pre-Arb players cost a fraction of free agents.</div>",
+            unsafe_allow_html=True,
+        )
+        try:
+            if _paw_df is not None:
+                _fc_all = _paw_df[(_paw_df["Salary_M"] > 0.3) & (_paw_df["WAR_Total"] > 0.5)].copy()
+                _fc_all["cost_per_fwar"] = (_fc_all["Salary_M"] / _fc_all["WAR_Total"].clip(lower=0.1)).round(2)
+
+                # Historical $/fWAR by stage
+                _fc_hist = _fc_all.groupby(["Year", "Stage_Clean"])["cost_per_fwar"].median().reset_index()
+
+                _fc_left, _fc_right = st.columns([7, 3])
+                with _fc_left:
+                    fig_fc = go.Figure()
+                    for _sk in ["Pre-Arb", "Arb", "FA"]:
+                        _sk_df = _fc_hist[_fc_hist["Stage_Clean"] == _sk].sort_values("Year")
+                        if not _sk_df.empty:
+                            fig_fc.add_trace(go.Scatter(
+                                x=_sk_df["Year"].astype(int), y=_sk_df["cost_per_fwar"],
+                                mode="lines+markers", name=_STAGE_LABELS[_sk],
+                                line=dict(color=_STAGE_COLORS[_sk], width=2.5),
+                                marker=dict(size=8),
+                            ))
+                    fig_fc.update_layout(**_pt(
+                        title="Median $/fWAR by Career Stage (2021–2025)",
+                        xaxis=dict(title="Season", dtick=1),
+                        yaxis=dict(title="$/fWAR ($M)"),
+                        height=400, showlegend=True,
+                        legend=dict(orientation="h", y=1.05, x=0.5, xanchor="center"),
+                        margin=dict(l=50, r=30, t=40, b=40),
+                    ))
+                    st.plotly_chart(fig_fc, use_container_width=True, config={"displayModeBar": False})
+                with _fc_right:
+                    _fc_cur = _fc_all[_fc_all["Year"] == sel_year]
+                    for _stg_key in ["FA", "Arb", "Pre-Arb"]:
+                        _stg_sub = _fc_cur[_fc_cur["Stage_Clean"] == _stg_key]
+                        _stg_val = _stg_sub["cost_per_fwar"].median() if not _stg_sub.empty else 0
+                        _stg_best = _stg_sub.sort_values("cost_per_fwar").iloc[0] if not _stg_sub.empty else None
+                        _best_txt = f"Best: {_stg_best['Player']} — ${_stg_best['cost_per_fwar']:.1f}M" if _stg_best is not None else ""
+                        st.markdown(
+                            _stage_card(_stg_key, f"${_stg_val:.1f}M", _best_txt, "median $/fWAR"),
+                            unsafe_allow_html=True,
+                        )
+
+                # Top 10 best-value players (min 2.0 fWAR)
+                st.markdown("---")
+                st.markdown(f"##### Best Value Players {sel_year} (min 2.0 fWAR)")
+                _fc_best = _fc_cur[_fc_cur["WAR_Total"] >= 2.0].sort_values("cost_per_fwar").head(10)
+                if not _fc_best.empty:
+                    _fb = _fc_best[["Player", "Team", "Position", "WAR_Total", "Salary_M", "cost_per_fwar", "Stage_Clean"]].copy()
+                    _fb.insert(0, "#", range(1, len(_fb) + 1))
+                    _fb = _fb.rename(columns={"WAR_Total": "fWAR", "Salary_M": "Salary $M", "cost_per_fwar": "$/fWAR $M", "Stage_Clean": "Stage"})
+                    st.dataframe(_fb, hide_index=True, use_container_width=True, height=400)
+        except Exception as _fc_e:
+            st.warning(f"Could not compute fWAR cost data: {_fc_e}")
+
+    # ── Tab 9: Position Value ────────────────────────────────────────────────
+    with rt9:
+        st.markdown(
+            "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;line-height:1.6;'>"
+            "Which positions give teams the most production per dollar? Position scarcity "
+            "and market dynamics create big differences in value.</div>",
+            unsafe_allow_html=True,
+        )
+        try:
+            if _paw_df is not None:
+                _pv_pos = ["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH", "SP", "RP"]
+                _pv_all = _paw_df[
+                    (_paw_df["Position"].isin(_pv_pos)) &
+                    (_paw_df["Salary_M"] > 0.3) &
+                    (_paw_df["WAR_Total"].notna())
+                ].copy()
+                _pv_all["fWAR_per_M"] = (_pv_all["WAR_Total"] / _pv_all["Salary_M"].clip(lower=0.1)).round(3)
+
+                # Current year position avg
+                _pv_cur = _pv_all[_pv_all["Year"] == sel_year]
+                _pv_avg = _pv_cur.groupby("Position")["fWAR_per_M"].mean().reindex(_pv_pos).dropna().sort_values(ascending=True)
+
+                _pv_left, _pv_right = st.columns([7, 3])
+                with _pv_left:
+                    _pv_colors = ["#22c55e" if v >= _pv_avg.quantile(0.75) else
+                                  "#4873b8" if v >= _pv_avg.quantile(0.25) else "#4a687e"
+                                  for v in _pv_avg.values]
+                    fig_pv = go.Figure(go.Bar(
+                        y=_pv_avg.index.tolist(), x=_pv_avg.values.tolist(), orientation="h",
+                        marker=dict(color=_pv_colors, line=dict(width=0)),
+                        text=[f"{v:.2f}" for v in _pv_avg.values],
+                        textposition="outside", textfont=dict(color="#d6e8f8", size=10),
+                        hovertemplate="%{y}: %{x:.2f} fWAR/$M<extra></extra>",
+                    ))
+                    fig_pv.update_layout(**_pt(
+                        title=f"{sel_year} — Average fWAR/$M by Position",
+                        xaxis=dict(title="fWAR per $M"),
+                        yaxis=dict(autorange="reversed"),
+                        height=max(340, len(_pv_avg) * 32),
+                        margin=dict(l=60, r=80, t=42, b=30),
+                    ))
+                    st.plotly_chart(fig_pv, use_container_width=True, config={"displayModeBar": False})
+                with _pv_right:
+                    _best_p = _pv_avg.idxmax() if not _pv_avg.empty else "—"
+                    _worst_p = _pv_avg.idxmin() if not _pv_avg.empty else "—"
+
+                    # Biggest year-over-year change
+                    _pv_prev = _pv_all[_pv_all["Year"] == sel_year - 1].groupby("Position")["fWAR_per_M"].mean()
+                    _pv_cur_avg = _pv_all[_pv_all["Year"] == sel_year].groupby("Position")["fWAR_per_M"].mean()
+                    _pv_delta = (_pv_cur_avg - _pv_prev).dropna()
+                    _biggest_change = _pv_delta.idxmax() if not _pv_delta.empty else "—"
+                    _biggest_val = _pv_delta.max() if not _pv_delta.empty else 0
+
+                    st.markdown(
+                        f"<div style='background:#1c2a42;border:1px solid #1e3050;"
+                        f"border-left:3px solid #22c55e;border-radius:8px;"
+                        f"padding:0.7rem 0.9rem;margin-bottom:0.5rem;text-align:center;'>"
+                        f"<div style='font-size:0.7rem;color:#93b8d8;font-weight:600;'>Most Efficient</div>"
+                        f"<div style='font-size:1.4rem;font-weight:800;color:#22c55e;margin:0.2rem 0;'>{_best_p}</div>"
+                        f"<div style='font-size:0.68rem;color:#7a9ebc;'>{_pv_avg.max():.2f} fWAR/$M</div></div>",
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        f"<div style='background:#1c2a42;border:1px solid #1e3050;"
+                        f"border-left:3px solid #ef4444;border-radius:8px;"
+                        f"padding:0.7rem 0.9rem;margin-bottom:0.5rem;text-align:center;'>"
+                        f"<div style='font-size:0.7rem;color:#93b8d8;font-weight:600;'>Least Efficient</div>"
+                        f"<div style='font-size:1.4rem;font-weight:800;color:#ef4444;margin:0.2rem 0;'>{_worst_p}</div>"
+                        f"<div style='font-size:0.68rem;color:#7a9ebc;'>{_pv_avg.min():.2f} fWAR/$M</div></div>",
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        f"<div style='background:#1c2a42;border:1px solid #1e3050;"
+                        f"border-left:3px solid #60a5fa;border-radius:8px;"
+                        f"padding:0.7rem 0.9rem;margin-bottom:0.5rem;text-align:center;'>"
+                        f"<div style='font-size:0.7rem;color:#93b8d8;font-weight:600;'>Biggest Change YoY</div>"
+                        f"<div style='font-size:1.4rem;font-weight:800;color:#60a5fa;margin:0.2rem 0;'>{_biggest_change}</div>"
+                        f"<div style='font-size:0.68rem;color:#7a9ebc;'>+{_biggest_val:.2f} fWAR/$M vs prior year</div></div>",
+                        unsafe_allow_html=True,
+                    )
+
+                # Historical top 3 positions
+                st.markdown("---")
+                st.markdown("##### Position Value Trends (2021–2025)")
+                _pv_hist = _pv_all.groupby(["Year", "Position"])["fWAR_per_M"].mean().reset_index()
+                _top3_pos = _pv_avg.nlargest(3).index.tolist() if not _pv_avg.empty else []
+                if _top3_pos:
+                    fig_pv_hist = go.Figure()
+                    _pos_colors = ["#22c55e", "#60a5fa", "#f59e0b"]
+                    for i, _pos in enumerate(_top3_pos):
+                        _pd = _pv_hist[_pv_hist["Position"] == _pos].sort_values("Year")
+                        fig_pv_hist.add_trace(go.Scatter(
+                            x=_pd["Year"].astype(int), y=_pd["fWAR_per_M"],
+                            mode="lines+markers", name=_pos,
+                            line=dict(color=_pos_colors[i % 3], width=2),
+                            marker=dict(size=7),
+                        ))
+                    fig_pv_hist.update_layout(**_pt(
+                        title="Top 3 Positions — fWAR/$M Over Time",
+                        xaxis=dict(title="Season", dtick=1),
+                        yaxis=dict(title="Avg fWAR/$M"),
+                        height=340, showlegend=True,
+                        legend=dict(orientation="h", y=1.05, x=0.5, xanchor="center"),
+                        margin=dict(l=50, r=30, t=40, b=40),
+                    ))
+                    _pv_h_col, _ = st.columns([3, 1])
+                    with _pv_h_col:
+                        st.plotly_chart(fig_pv_hist, use_container_width=True, config={"displayModeBar": False})
+        except Exception as _pv_e:
+            st.warning(f"Could not compute position value data: {_pv_e}")
 
     _render_feedback_widget("rankings")
