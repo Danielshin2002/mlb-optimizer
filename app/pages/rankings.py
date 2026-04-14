@@ -203,11 +203,12 @@ def render(*_args, **_kwargs):
         "eff_playoffs": "playoff_success",
         "fwar_cost": "fwar_cost",
         "best_position": "position_value",
+        "best_age": "age_value",
     }
     _TAB_ORDER = [
         "efficiency", "fwar", "salary", "winperf",
         "contract_value", "stability",
-        "playoff_success", "fwar_cost", "position_value",
+        "playoff_success", "fwar_cost", "position_value", "age_value",
     ]
     if "rk_active_tab" not in st.session_state:
         st.session_state["rk_active_tab"] = "efficiency"
@@ -272,8 +273,8 @@ def render(*_args, **_kwargs):
         _f2_pre["payroll_M"] = pd.to_numeric(_f2_pre["payroll_M"], errors="coerce")
         _f2_pre["Wins"] = pd.to_numeric(_f2_pre["Wins"], errors="coerce")
         _TIERS_PRE = [
-            ("Budget ($0-100M)", 0, 100), ("Mid-Market ($100-175M)", 100, 175),
-            ("Contender ($175-244M)", 175, 244), ("Big Market ($244M+)", 244, 999),
+            ("Budget (&#36;0-100M)", 0, 100), ("Mid-Market (&#36;100-175M)", 100, 175),
+            ("Contender (&#36;175-244M)", 175, 244), ("Big Market (&#36;244M+)", 244, 999),
         ]
         _best_slope = -999
         for _tn, _tlo, _thi in _TIERS_PRE:
@@ -284,7 +285,7 @@ def render(*_args, **_kwargs):
                 if _tw10 > _best_slope:
                     _best_slope = _tw10
                     _best_marginal_name = _tn
-                    _best_marginal_val = f"+{_tw10:.2f} wins/$10M"
+                    _best_marginal_val = f"+{_tw10:.2f} wins/&#36;10M"
 
     # Strongest fWAR-Wins Link — R² value
     _fwar_r2_str = ""
@@ -320,7 +321,7 @@ def render(*_args, **_kwargs):
     _avg_dpw_str = ""
     if not yr_df.empty and "DPW" in yr_df.columns:
         _avg_dpw = yr_df["DPW"].median()
-        _avg_dpw_str = f"${_avg_dpw:.1f}M per fWAR"
+        _avg_dpw_str = f"&#36;{_avg_dpw:.1f}M per fWAR"
 
     # 3. Most efficient position
     _best_pos_name = ""
@@ -333,7 +334,23 @@ def render(*_args, **_kwargs):
             _pos_avg = _pos_avg[_pos_avg.index.isin(["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH", "SP", "RP"])]
             if not _pos_avg.empty:
                 _best_pos_name = _pos_avg.idxmax()
-                _best_pos_val = f"{_pos_avg.max():.2f} fWAR/$M"
+                _best_pos_val = f"{_pos_avg.max():.2f} fWAR/&#36;M"
+
+    # 4. Most efficient age
+    _best_age = ""
+    _best_age_val = ""
+    if _paw_df is not None and not _paw_25.empty:
+        _age_eff = _paw_25[(_paw_25["Salary_M"] > 0.5) & (_paw_25["WAR_Total"] >= 1.0)].copy()
+        _age_eff["Age"] = pd.to_numeric(_age_eff.get("Age", pd.Series(dtype=float)), errors="coerce")
+        _age_eff = _age_eff.dropna(subset=["Age"])
+        if not _age_eff.empty:
+            _age_eff["_age_int"] = _age_eff["Age"].astype(int)
+            _age_eff["_wpm"] = _age_eff["WAR_Total"] / _age_eff["Salary_M"].clip(lower=0.1)
+            _age_grp = _age_eff.groupby("_age_int").agg(_wpm=("_wpm", "mean"), _n=("Player", "count"))
+            _age_grp = _age_grp[_age_grp["_n"] >= 5]
+            if not _age_grp.empty:
+                _best_age = str(_age_grp["_wpm"].idxmax())
+                _best_age_val = f"{_age_grp['_wpm'].max():.2f} fWAR/&#36;M"
 
     # ── Build box HTML helper ─────────────────────────────────────────────────
     def _box_html(box_id, label, team_name, val_str, logo_url="", img_html="", team_abbr=""):
@@ -377,13 +394,13 @@ def render(*_args, **_kwargs):
     # ── Row 1 + Row 2: Team boxes ─────────────────────────────────────────────
     _box_defs = [
         ("most_efficient", "MOST EFFICIENT", _full(_best_eff),
-         f"${_best_eff['dollar_gap_M']:.0f}M below the line", team_logo_url(_best_eff["Team"]), _best_eff["Team"]),
+         f"&#36;{_best_eff['dollar_gap_M']:.0f}M below the line", team_logo_url(_best_eff["Team"]), _best_eff["Team"]),
         ("top_overperformer", "TOP OVERPERFORMER", _full(_overperf),
          f"+{_overperf['wins_vs_pred']:.1f} wins vs forecast", team_logo_url(_overperf["Team"]), _overperf["Team"]),
-        ("best_dpw", "BEST $/fWAR", _full(_best_dpw),
-         f"${_best_dpw['DPW']:.1f}M per fWAR", team_logo_url(_best_dpw["Team"]), _best_dpw["Team"]),
+        ("best_dpw", "BEST &#36;/fWAR", _full(_best_dpw),
+         f"&#36;{_best_dpw['DPW']:.1f}M per fWAR", team_logo_url(_best_dpw["Team"]), _best_dpw["Team"]),
         ("least_efficient", "LEAST EFFICIENT", _full(_worst_eff),
-         f"${_worst_eff['dollar_gap_M']:.0f}M above the line", team_logo_url(_worst_eff["Team"]), _worst_eff["Team"]),
+         f"&#36;{_worst_eff['dollar_gap_M']:.0f}M above the line", team_logo_url(_worst_eff["Team"]), _worst_eff["Team"]),
         ("top_fwar", "TOP fWAR", _full(_top_war),
          f"{_top_war['team_WAR']:.1f} total fWAR", team_logo_url(_top_war["Team"]), _top_war["Team"]),
         ("most_wins", "MOST WINS", _full(_top_wins),
@@ -423,8 +440,8 @@ def render(*_args, **_kwargs):
         if _p_best_val is not None:
             _render_box(_player_box_html(
                 "p_contract_val", "TOP CONTRACT VALUE", str(_p_best_val["Player"]),
-                str(_p_best_val["Team"]), f"{_p_best_val['_wpm']:.2f} fWAR/$M",
-                f"{_p_best_val['WAR_Total']:.1f} fWAR \u00b7 ${_p_best_val['Salary_M']:.1f}M"))
+                str(_p_best_val["Team"]), f"{_p_best_val['_wpm']:.2f} fWAR/&#36;M",
+                f"{_p_best_val['WAR_Total']:.1f} fWAR \u00b7 &#36;{_p_best_val['Salary_M']:.1f}M"))
     with _r3c3:
         if _p_best_wsr is not None:
             _render_box(_player_box_html(
@@ -454,7 +471,9 @@ def render(*_args, **_kwargs):
                                _best_pos_name, _best_pos_val,
                                img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>\U0001f3df\ufe0f</div>"))
     with _r5c3:
-        pass
+        _render_box(_box_html("best_age", "MOST EFFICIENT AGE",
+                               _best_age, _best_age_val,
+                               img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>\U0001f4c5</div>"))
 
     # Animated hint (disappears after first click)
     if not st.session_state.get("rk_box_clicked"):
@@ -502,6 +521,7 @@ def render(*_args, **_kwargs):
         "playoff_success": "📊 Playoff Success",
         "fwar_cost": "💵 fWAR Cost",
         "position_value": "🏟️ Position Value",
+        "age_value": "📅 Age Value",
     }
     _tab_html = "<div class='rk-tabs'>"
     for _tk in _TAB_ORDER:
@@ -1383,9 +1403,9 @@ def render(*_args, **_kwargs):
                         _stg_sub = _fc_cur[_fc_cur["Stage_Clean"] == _stg_key]
                         _stg_val = _stg_sub["cost_per_fwar"].median() if not _stg_sub.empty else 0
                         _stg_best = _stg_sub.sort_values("cost_per_fwar").iloc[0] if not _stg_sub.empty else None
-                        _best_txt = f"Best: {_stg_best['Player']} — ${_stg_best['cost_per_fwar']:.1f}M" if _stg_best is not None else ""
+                        _best_txt = f"Best: {_stg_best['Player']} — &#36;{_stg_best['cost_per_fwar']:.1f}M" if _stg_best is not None else ""
                         st.markdown(
-                            _stage_card(_stg_key, f"${_stg_val:.1f}M", _best_txt, "median $/fWAR"),
+                            _stage_card(_stg_key, f"&#36;{_stg_val:.1f}M", _best_txt, "median &#36;/fWAR"),
                             unsafe_allow_html=True,
                         )
 
@@ -1511,5 +1531,143 @@ def render(*_args, **_kwargs):
                         st.plotly_chart(fig_pv_hist, use_container_width=True, config={"displayModeBar": False})
         except Exception as _pv_e:
             st.warning(f"Could not compute position value data: {_pv_e}")
+
+    # ── Tab 10: Age Value ───────────────────────────────────────────────────
+    if _act_tab == "age_value":
+        st.markdown(
+            "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;line-height:1.6;'>"
+            "At what age do players deliver the most production per dollar? Young players on "
+            "pre-arb deals offer extreme value, but peak performance often comes later. "
+            "This analysis finds the sweet spot."
+            "<br><span style='font-size:0.75rem;color:#5a7a94;'>Formula: "
+            "<code style='color:#60a5fa;'>Age Efficiency = Avg fWAR \u00f7 Avg Salary (&#36;M)</code>"
+            "</span></div>",
+            unsafe_allow_html=True,
+        )
+        try:
+            if _paw_df is not None:
+                _, _, _av_c1 = st.columns([6, 2, 2])
+                with _av_c1:
+                    _av_min_war = st.selectbox("Min fWAR", [0.5, 1.0, 2.0, 3.0], index=1, key="av_min_war")
+
+                _av_all = _paw_df[
+                    (_paw_df["Salary_M"] > 0.5) & (_paw_df["WAR_Total"] >= _av_min_war)
+                ].copy()
+                _av_all["Age"] = pd.to_numeric(_av_all.get("Age", pd.Series(dtype=float)), errors="coerce")
+                _av_all = _av_all.dropna(subset=["Age"])
+                _av_all["_age_int"] = _av_all["Age"].astype(int)
+                _av_all["_wpm"] = _av_all["WAR_Total"] / _av_all["Salary_M"].clip(lower=0.1)
+
+                _av_cur = _av_all[_av_all["Year"] == sel_year]
+                _av_grp = _av_cur.groupby("_age_int").agg(
+                    _wpm=("_wpm", "mean"), _n=("Player", "count"),
+                    _war=("WAR_Total", "mean"), _sal=("Salary_M", "mean"),
+                ).reset_index()
+                _av_grp = _av_grp[_av_grp["_n"] >= 3].sort_values("_age_int")
+
+                _av_left, _av_right = st.columns([7, 3])
+                with _av_left:
+                    if not _av_grp.empty:
+                        _peak_age = _av_grp.loc[_av_grp["_wpm"].idxmax(), "_age_int"]
+                        # Color by typical stage at each age
+                        _av_colors = []
+                        for age in _av_grp["_age_int"]:
+                            if age <= 24:
+                                _av_colors.append(_STAGE_COLORS["Pre-Arb"])
+                            elif age <= 27:
+                                _av_colors.append(_STAGE_COLORS["Arb"])
+                            else:
+                                _av_colors.append(_STAGE_COLORS["FA"])
+                        fig_av = go.Figure(go.Bar(
+                            x=_av_grp["_age_int"], y=_av_grp["_wpm"],
+                            marker=dict(color=_av_colors, line=dict(width=0)),
+                            text=[f"{v:.2f}" for v in _av_grp["_wpm"]],
+                            textposition="outside", textfont=dict(color="#d6e8f8", size=9),
+                            hovertemplate=(
+                                "Age %{x}<br>fWAR/&#36;M: %{y:.2f}<br>"
+                                "Players: %{customdata[0]}<br>"
+                                "Avg fWAR: %{customdata[1]:.1f}<br>"
+                                "Avg Salary: &#36;%{customdata[2]:.1f}M<extra></extra>"
+                            ),
+                            customdata=_av_grp[["_n", "_war", "_sal"]].values,
+                        ))
+                        fig_av.update_layout(**_pt(
+                            title=f"{sel_year} — Efficiency by Age (min {_av_min_war} fWAR)",
+                            xaxis=dict(title="Age", dtick=1),
+                            yaxis=dict(title="Avg fWAR/&#36;M"),
+                            height=400,
+                            margin=dict(l=50, r=30, t=40, b=40),
+                        ))
+                        st.plotly_chart(fig_av, use_container_width=True, config={"displayModeBar": False})
+                with _av_right:
+                    for _stg_key in ["Pre-Arb", "Arb", "FA"]:
+                        _stg_sub = _av_cur[_av_cur["Stage_Clean"] == _stg_key]
+                        _stg_avg_age = _stg_sub["Age"].mean() if not _stg_sub.empty else 0
+                        _stg_val = _stg_sub["_wpm"].mean() if not _stg_sub.empty else 0
+                        _stg_best = _stg_sub.sort_values("_wpm", ascending=False).iloc[0] if not _stg_sub.empty else None
+                        _best_txt = (f"Best: {_stg_best['Player']} age {int(_stg_best['Age'])} \u2014 "
+                                     f"{_stg_best['_wpm']:.2f}") if _stg_best is not None else ""
+                        st.markdown(
+                            _stage_card(_stg_key, f"{_stg_val:.2f}",
+                                        _best_txt, f"avg fWAR/&#36;M \u00b7 avg age {_stg_avg_age:.0f}"),
+                            unsafe_allow_html=True,
+                        )
+
+                # Historical line chart by age group
+                st.markdown("---")
+                st.markdown("##### Efficiency by Age Group Over Time (2021\u20132025)")
+                _av_hist_data = []
+                for yr in sorted(_av_all["Year"].unique()):
+                    _yr_d = _av_all[_av_all["Year"] == yr]
+                    for _label, _lo, _hi, _clr in [
+                        ("Under 25", 0, 25, _STAGE_COLORS["Pre-Arb"]),
+                        ("25\u201329", 25, 30, _STAGE_COLORS["Arb"]),
+                        ("30+", 30, 99, _STAGE_COLORS["FA"]),
+                    ]:
+                        _grp = _yr_d[(_yr_d["_age_int"] >= _lo) & (_yr_d["_age_int"] < _hi)]
+                        if len(_grp) >= 3:
+                            _av_hist_data.append({
+                                "Year": int(yr), "Group": _label,
+                                "wpm": _grp["_wpm"].mean(), "color": _clr,
+                            })
+                if _av_hist_data:
+                    _av_hist_df = pd.DataFrame(_av_hist_data)
+                    fig_av_hist = go.Figure()
+                    for _g in ["Under 25", "25\u201329", "30+"]:
+                        _gd = _av_hist_df[_av_hist_df["Group"] == _g].sort_values("Year")
+                        if not _gd.empty:
+                            fig_av_hist.add_trace(go.Scatter(
+                                x=_gd["Year"], y=_gd["wpm"], mode="lines+markers",
+                                name=_g, line=dict(color=_gd["color"].iloc[0], width=2),
+                                marker=dict(size=7),
+                            ))
+                    fig_av_hist.update_layout(**_pt(
+                        xaxis=dict(title="Season", dtick=1),
+                        yaxis=dict(title="Avg fWAR/&#36;M"),
+                        height=340, showlegend=True,
+                        legend=dict(orientation="h", y=1.05, x=0.5, xanchor="center"),
+                        margin=dict(l=50, r=30, t=30, b=40),
+                    ))
+                    _av_h_col, _ = st.columns([3, 1])
+                    with _av_h_col:
+                        st.plotly_chart(fig_av_hist, use_container_width=True, config={"displayModeBar": False})
+
+                # Peak age insight
+                if not _av_grp.empty:
+                    _peak_wpm = _av_grp.loc[_av_grp["_wpm"].idxmax()]
+                    _lg_avg_wpm = _av_cur["_wpm"].mean() if not _av_cur.empty else 1
+                    _pct_above = ((_peak_wpm["_wpm"] / max(_lg_avg_wpm, 0.01)) - 1) * 100
+                    st.markdown(
+                        f"<div style='background:#0d1e35;border-left:3px solid #5dc9a5;border-radius:0 8px 8px 0;"
+                        f"padding:0.7rem 1rem;margin-top:0.6rem;font-size:0.82rem;color:#93b8d8;line-height:1.6;'>"
+                        f"Players aged <b style='color:#5dc9a5;'>{int(_peak_wpm['_age_int'])}</b> produced the "
+                        f"best value in {sel_year}, averaging <b style='color:#5dc9a5;'>"
+                        f"{_peak_wpm['_wpm']:.2f} fWAR/&#36;M</b>. "
+                        f"That's <b>{_pct_above:.0f}%</b> above the league average of "
+                        f"{_lg_avg_wpm:.2f} fWAR/&#36;M.</div>",
+                        unsafe_allow_html=True,
+                    )
+        except Exception as _av_e:
+            st.warning(f"Could not compute age value data: {_av_e}")
 
     _render_feedback_widget("rankings")
