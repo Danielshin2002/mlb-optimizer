@@ -205,9 +205,7 @@ def render(*_args, **_kwargs):
 
     # KPI box style — consistent background, white border, fixed height
     _kpi = ("background:#0d1b2a;border:1px solid #ffffff33;border-radius:8px;"
-            "padding:12px 8px;text-align:center;min-width:100px;"
-            "min-height:90px;display:flex;flex-direction:column;"
-            "align-items:center;justify-content:center;")
+            "padding:10px 8px;text-align:center;min-width:100px;min-height:88px;")
 
     # Compute league avg fWAR and $/fWAR for context
     _lg_avg_war = float(all_eff_2025["team_WAR"].mean()) if not all_eff_2025.empty else 0

@@ -397,57 +397,42 @@ def render(*_args, **_kwargs):
          f"{int(_top_wins['Wins'])} wins", team_logo_url(_top_wins["Team"]), _top_wins["Team"]),
     ]
 
-    _grid_html = "<div class='rk-grid'>"
+    # ── All boxes in one grid ────────────────────────────────────────────────
+    _all_boxes = "<div class='rk-grid'>"
+    # Row 1-2: Team boxes
     for box_id, label, team_name, val_str, logo_url, t_abbr in _box_defs:
-        _grid_html += _box_html(box_id, label, team_name, val_str, logo_url=logo_url, team_abbr=t_abbr)
-    _grid_html += "</div>"
-    st.markdown(_grid_html, unsafe_allow_html=True)
-
-    # ── Row 3: Player award boxes ─────────────────────────────────────────────
-    _p_grid_html = "<div class='rk-grid'>"
-    _p_count = 0
+        _all_boxes += _box_html(box_id, label, team_name, val_str, logo_url=logo_url, team_abbr=t_abbr)
+    # Row 3: Player award boxes
     if _p_top_war is not None:
-        _p_grid_html += _player_box_html(
+        _all_boxes += _player_box_html(
             "p_top_fwar", f"#1 fWAR ({sel_year})", str(_p_top_war["Player"]),
             str(_p_top_war["Team"]), f"{_p_top_war['WAR_Total']:.1f} fWAR")
-        _p_count += 1
     if _p_best_val is not None:
-        _p_grid_html += _player_box_html(
+        _all_boxes += _player_box_html(
             "p_contract_val", "TOP CONTRACT VALUE", str(_p_best_val["Player"]),
             str(_p_best_val["Team"]), f"{_p_best_val['_wpm']:.2f} fWAR/$M",
             f"{_p_best_val['WAR_Total']:.1f} fWAR \u00b7 ${_p_best_val['Salary_M']:.1f}M")
-        _p_count += 1
     if _p_best_wsr is not None:
-        _p_grid_html += _player_box_html(
+        _all_boxes += _player_box_html(
             "p_stability", "BEST fWAR STABILITY", str(_p_best_wsr["Player"]),
             str(_p_best_wsr["Team"]), f"{_p_best_wsr['WSR']:.2f} WSR",
             f"Avg {_p_best_wsr['_mean']:.1f} fWAR \u00b7 {int(_p_best_wsr['_n'])} seasons")
-        _p_count += 1
-    _p_grid_html += "</div>"
-    if _p_count > 0:
-        st.markdown(_p_grid_html, unsafe_allow_html=True)
-
-    # ── Row 4: Analysis boxes ────────────────────────────────────────────────
-    _r4_html = "<div class='rk-grid'>"
-    _r4_html += _box_html("best_marginal", "BEST MARGINAL SPENDING", _best_marginal_name, _best_marginal_val)
-    _r4_html += _box_html("fwar_wins_link", "STRONGEST fWAR-WINS LINK", "All Teams", _fwar_r2_str)
-    _r4_html += _box_html("eff_playoffs", "EFFICIENCY → PLAYOFFS?",
-                           "Efficient vs Inefficient", _eff_playoff_str,
-                           img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>📊</div>")
-    _r4_html += "</div>"
-    st.markdown(_r4_html, unsafe_allow_html=True)
-
-    # ── Row 5: Insight boxes ──────────────────────────────────────────────────
-    _r5_html = "<div class='rk-grid'>"
-    _r5_html += _box_html("fwar_cost", "HOW MUCH DOES 1 fWAR COST?",
-                           f"{sel_year} League", _avg_dpw_str,
-                           img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>💵</div>")
-    _r5_html += _box_html("best_position", "MOST EFFICIENT POSITION",
-                           _best_pos_name, _best_pos_val,
-                           img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>🏟️</div>")
-    _r5_html += "<div></div>"  # empty third slot
-    _r5_html += "</div>"
-    st.markdown(_r5_html, unsafe_allow_html=True)
+    # Row 4: Analysis boxes
+    _all_boxes += _box_html("best_marginal", "BEST MARGINAL SPENDING", _best_marginal_name, _best_marginal_val)
+    _all_boxes += _box_html("fwar_wins_link", "STRONGEST fWAR-WINS LINK", "All Teams", _fwar_r2_str)
+    _all_boxes += _box_html("eff_playoffs", "EFFICIENCY \u2192 PLAYOFFS?",
+                             _eff_playoff_str, "Efficient vs Inefficient",
+                             img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>\U0001f4ca</div>")
+    # Row 5: Insight boxes
+    _all_boxes += _box_html("fwar_cost", "HOW MUCH DOES 1 fWAR COST?",
+                             _avg_dpw_str, "",
+                             img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>\U0001f4b5</div>")
+    _all_boxes += _box_html("best_position", "MOST EFFICIENT POSITION",
+                             _best_pos_val, f"Position: {_best_pos_name}",
+                             img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>\U0001f3df\ufe0f</div>")
+    _all_boxes += "<div></div>"
+    _all_boxes += "</div>"
+    st.markdown(_all_boxes, unsafe_allow_html=True)
 
     # Animated hint (disappears after first click)
     if not st.session_state.get("rk_box_clicked"):
