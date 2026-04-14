@@ -112,26 +112,24 @@ def render(*_args, **_kwargs):
     # ── Page header ───────────────────────────────────────────────────────────
     st.markdown(
         "<div class='rk-hdr'>"
-        "<h2>\U0001f3c6 MLB Spending Efficiency Rankings</h2>"
-        "<div class='rk-sub'>All 30 MLB teams ranked by spending efficiency, fWAR production, "
-        "payroll, and win performance. Efficiency measures how far above or below the "
-        "cost-effective line each team sits \u2014 negative means winning more per dollar.</div>"
+        "<h2>\U0001f3c6 MLB Toolbox Rankings</h2>"
+        "<div class='rk-sub'>The 30-team report card on spending vs. winning.</div>"
         "</div>",
         unsafe_allow_html=True,
     )
 
-    # ── Year selector (right) + instruction (left) ───────────────────────────
+    # ── Instruction + year selector on same row ──────────────────────────────
     years_avail = sorted(detail_df["Year"].dropna().unique().astype(int), reverse=True)
-    _hint_col, _, _yr_col = st.columns([5, 3, 2])
+    _hint_col, _yr_col = st.columns([8, 2])
     with _hint_col:
         st.markdown(
-            "<div style='padding-top:0.45rem;font-size:0.88rem;color:#7a9ebc;'>"
+            "<div style='padding-top:0.35rem;font-size:1rem;color:#93b8d8;font-weight:700;'>"
             "Click a box to get started</div>",
             unsafe_allow_html=True,
         )
     with _yr_col:
         _yr_default = years_avail.index(int(_qp_yr)) if _qp_yr and int(_qp_yr) in years_avail else 0
-        sel_year = st.selectbox("Season", years_avail, key="rk_year_sel", index=_yr_default)
+        sel_year = st.selectbox("Season", years_avail, key="rk_year_sel", index=_yr_default, label_visibility="collapsed")
 
     yr_df = detail_df[detail_df["Year"] == sel_year].copy()
     if yr_df.empty:

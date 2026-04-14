@@ -144,6 +144,12 @@ footer { display: none !important; }
   padding-right: 1rem !important;
   animation: fadeIn 0.4s ease-out;
 }
+[data-testid="stMainBlockContainer"] {
+  padding-top: 0.5rem !important;
+}
+[data-testid="stMain"] > div:first-child {
+  padding-top: 0 !important;
+}
 
 /* === GLOBAL POLISH — Animations & UX === */
 
@@ -746,12 +752,19 @@ button[data-testid="stMultiSelectClearButton"] { display: none !important; }
         + _a('glossary', '📖 Methodology')
         + _a('feedback', '💬 Feedback')
         + '</div>'
-        + '<hr style="margin:0.4rem 0 1rem;border:none;border-top:1px solid #1e3250;">'
+        + '<hr style="margin:0.4rem 0 0.6rem;border:none;border-top:1px solid #1e3250;">'
     )
     st.markdown(nav, unsafe_allow_html=True)
 
-    # ── Dark / Light mode toggle ─────────────────────────────────────────
-    _tc1, _tc2 = st.columns([10, 1])
+    # ── Dark / Light mode toggle (compact, right-aligned under nav) ──────
+    st.markdown(
+        "<style>"
+        "[data-testid='stMainBlockContainer'] > div:first-child "
+        ".toggle-row { display:flex; justify-content:flex-end; margin-top:-0.6rem; margin-bottom:0.3rem; }"
+        "</style>",
+        unsafe_allow_html=True,
+    )
+    _tc1, _tc2 = st.columns([11, 1])
     with _tc2:
         _light = st.toggle("☀️", key="light_mode", value=False)
     if _light:

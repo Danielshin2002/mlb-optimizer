@@ -203,9 +203,11 @@ def render(*_args, **_kwargs):
     if not all_eff_2025.empty and "division" in all_eff_2025.columns and sel_team in all_eff_2025["Team"].values:
         _team_div = str(all_eff_2025.loc[all_eff_2025["Team"] == sel_team, "division"].values[0])
 
-    # KPI box style — consistent background, white border
+    # KPI box style — consistent background, white border, fixed height
     _kpi = ("background:#0d1b2a;border:1px solid #ffffff33;border-radius:8px;"
-            "padding:12px 16px;text-align:center;min-width:100px;")
+            "padding:12px 8px;text-align:center;min-width:100px;"
+            "min-height:90px;display:flex;flex-direction:column;"
+            "align-items:center;justify-content:center;")
 
     # Compute league avg fWAR and $/fWAR for context
     _lg_avg_war = float(all_eff_2025["team_WAR"].mean()) if not all_eff_2025.empty else 0
@@ -466,7 +468,7 @@ def render(*_args, **_kwargs):
                 _il_tbl.insert(2, "IL Type", _il_df["status"].apply(
                     lambda s: "60-Day" if "60" in str(s) else "15-Day" if "15" in str(s) else "10-Day"
                 ).values)
-                st.markdown(f"##### 🏥 Injured List ({len(_il_df)} players)")
+                st.markdown(f"##### Injured List ({len(_il_df)} players)")
                 st.dataframe(
                     _il_tbl.style.apply(
                         lambda row: ["background-color:#2d0c0c66;color:#fca5a5"] * len(row), axis=1
