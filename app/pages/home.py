@@ -109,81 +109,60 @@ def render(*_args, **_kwargs):
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown(f"""
-    <div style="background:#080e1a;border-radius:12px;overflow:hidden;position:relative;
-                margin:-0.5rem -1rem 0;padding:0;">
-
-      <!-- ═══ TUNNEL SECTION ═══ -->
-      <div style="position:relative;min-height:380px;">
-
-        <!-- Gold vertical tunnel lines -->
-        <div style="position:absolute;left:78px;top:0;bottom:0;width:1px;
-                    background:linear-gradient(180deg,transparent,#c9a94e22,transparent);"></div>
-        <div style="position:absolute;right:78px;top:0;bottom:0;width:1px;
-                    background:linear-gradient(180deg,transparent,#c9a94e22,transparent);"></div>
-
-        <!-- Gold horizontal stripes — left wall -->
-        <div style="position:absolute;left:79px;top:25%;width:45px;height:1px;background:#c9a94e18;"></div>
-        <div style="position:absolute;left:79px;top:45%;width:35px;height:1px;background:#c9a94e10;"></div>
-        <div style="position:absolute;left:79px;top:65%;width:25px;height:1px;background:#c9a94e0c;"></div>
-        <!-- Gold horizontal stripes — right wall -->
-        <div style="position:absolute;right:79px;top:30%;width:45px;height:1px;background:#c9a94e18;"></div>
-        <div style="position:absolute;right:79px;top:50%;width:35px;height:1px;background:#c9a94e10;"></div>
-        <div style="position:absolute;right:79px;top:70%;width:25px;height:1px;background:#c9a94e0c;"></div>
-
-        <!-- Player headshots -->
-        {_left_wall}
-        {_right_wall}
-
-        <!-- Dark gradient overlays on edges (fade players into background) -->
-        <div style="position:absolute;left:0;top:0;bottom:0;width:90px;
-                    background:linear-gradient(90deg,#080e1a 0%,transparent 100%);z-index:1;"></div>
-        <div style="position:absolute;right:0;top:0;bottom:0;width:90px;
-                    background:linear-gradient(270deg,#080e1a 0%,transparent 100%);z-index:1;"></div>
-
-        <!-- Center title -->
-        <div style="position:relative;z-index:2;text-align:center;padding:50px 80px 24px;">
-          <div style="font-size:11px;color:#c9a94e;letter-spacing:3px;text-transform:uppercase;
-                      animation:gold-pulse 3s ease-in-out infinite;margin-bottom:10px;">
-            ENTERING THE FIELD</div>
-          <div style="font-size:28px;font-weight:500;color:#e8f4ff;margin-bottom:6px;">
-            MLB Toolbox</div>
-          <div style="font-size:13px;color:#4a687e;">
-            Data-driven baseball analysis</div>
-        </div>
-
-        <!-- ═══ LINEUP CARD (inside tunnel — no gap) ═══ -->
-        <div style="position:relative;z-index:2;padding:0 60px 0;">
-          <div style="max-width:500px;margin:0 auto;background:#0b1422;
-                      border:1px solid #1e3050;border-radius:8px;overflow:hidden;">
-
-            <!-- Card header -->
-            <div style="display:flex;justify-content:space-between;align-items:center;
-                        padding:10px 16px;border-bottom:1px solid #0e1828;">
-              <span style="font-size:13px;font-weight:500;color:#e8f4ff;">Today's lineup</span>
-              <span style="font-size:10px;color:#4a687e;letter-spacing:1px;">2025 SEASON</span>
-            </div>
-
-            <!-- Lineup rows -->
-            {_lineup_html}
-
-          </div>
-        </div>
-
-        <!-- Spacer below card, still inside tunnel -->
-        <div style="height:30px;"></div>
-      </div>
-
-      <!-- ═══ TUNNEL FLOOR TRANSITION ═══ -->
-      <div style="height:3px;background:linear-gradient(90deg,transparent 5%,#1e3050 50%,transparent 95%);
-                  margin:0 40px;"></div>
-      <div style="height:1px;background:linear-gradient(90deg,transparent 15%,#2a5a3a44 50%,transparent 85%);
-                  margin:4px 60px 0;opacity:0.6;"></div>
-
-      <!-- ═══ FOOTER ═══ -->
-      <div style="text-align:center;padding:14px 0 18px;">
-        <span style="font-size:11px;color:#2a4a3a;">150 team-seasons analyzed across 5 years</span>
-      </div>
-
-    </div>
-    """, unsafe_allow_html=True)
+    # Build as a single flat string — no indentation that Streamlit could
+    # misinterpret as Markdown code blocks.
+    _page = (
+        "<div style='background:#080e1a;border-radius:12px;overflow:hidden;position:relative;"
+        "margin:-0.5rem -1rem 0;padding:0;'>"
+        "<div style='position:relative;min-height:380px;'>"
+        # Gold vertical tunnel lines
+        "<div style='position:absolute;left:78px;top:0;bottom:0;width:1px;"
+        "background:linear-gradient(180deg,transparent,#c9a94e22,transparent);'></div>"
+        "<div style='position:absolute;right:78px;top:0;bottom:0;width:1px;"
+        "background:linear-gradient(180deg,transparent,#c9a94e22,transparent);'></div>"
+        # Gold horizontal stripes
+        "<div style='position:absolute;left:79px;top:25%;width:45px;height:1px;background:#c9a94e18;'></div>"
+        "<div style='position:absolute;left:79px;top:45%;width:35px;height:1px;background:#c9a94e10;'></div>"
+        "<div style='position:absolute;left:79px;top:65%;width:25px;height:1px;background:#c9a94e0c;'></div>"
+        "<div style='position:absolute;right:79px;top:30%;width:45px;height:1px;background:#c9a94e18;'></div>"
+        "<div style='position:absolute;right:79px;top:50%;width:35px;height:1px;background:#c9a94e10;'></div>"
+        "<div style='position:absolute;right:79px;top:70%;width:25px;height:1px;background:#c9a94e0c;'></div>"
+        # Player headshots
+        + _left_wall + _right_wall +
+        # Dark gradient overlays
+        "<div style='position:absolute;left:0;top:0;bottom:0;width:90px;"
+        "background:linear-gradient(90deg,#080e1a 0%,transparent 100%);z-index:1;'></div>"
+        "<div style='position:absolute;right:0;top:0;bottom:0;width:90px;"
+        "background:linear-gradient(270deg,#080e1a 0%,transparent 100%);z-index:1;'></div>"
+        # Center title
+        "<div style='position:relative;z-index:2;text-align:center;padding:50px 80px 24px;'>"
+        "<div style='font-size:11px;color:#c9a94e;letter-spacing:3px;text-transform:uppercase;"
+        "animation:gold-pulse 3s ease-in-out infinite;margin-bottom:10px;'>ENTERING THE FIELD</div>"
+        "<div style='font-size:28px;font-weight:500;color:#e8f4ff;margin-bottom:6px;'>MLB Toolbox</div>"
+        "<div style='font-size:13px;color:#4a687e;'>Data-driven baseball analysis</div>"
+        "</div>"
+        # Lineup card
+        "<div style='position:relative;z-index:2;padding:0 60px 0;'>"
+        "<div style='max-width:500px;margin:0 auto;background:#0b1422;"
+        "border:1px solid #1e3050;border-radius:8px;overflow:hidden;'>"
+        "<div style='display:flex;justify-content:space-between;align-items:center;"
+        "padding:10px 16px;border-bottom:1px solid #0e1828;'>"
+        "<span style='font-size:13px;font-weight:500;color:#e8f4ff;'>Today's lineup</span>"
+        "<span style='font-size:10px;color:#4a687e;letter-spacing:1px;'>2025 SEASON</span>"
+        "</div>"
+        + _lineup_html +
+        "</div></div>"
+        "<div style='height:30px;'></div>"
+        "</div>"
+        # Tunnel floor
+        "<div style='height:3px;background:linear-gradient(90deg,transparent 5%,#1e3050 50%,transparent 95%);"
+        "margin:0 40px;'></div>"
+        "<div style='height:1px;background:linear-gradient(90deg,transparent 15%,#2a5a3a44 50%,transparent 85%);"
+        "margin:4px 60px 0;opacity:0.6;'></div>"
+        # Footer
+        "<div style='text-align:center;padding:14px 0 18px;'>"
+        "<span style='font-size:11px;color:#2a4a3a;'>150 team-seasons analyzed across 5 years</span>"
+        "</div>"
+        "</div>"
+    )
+    st.markdown(_page, unsafe_allow_html=True)
