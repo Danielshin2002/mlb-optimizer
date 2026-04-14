@@ -80,6 +80,14 @@ def render(*_args, **_kwargs):
 @keyframes gentle-pulse{0%,100%{opacity:0.4;}50%{opacity:1;}}
 .rk-hint{text-align:center;color:#4a687e;font-size:0.82rem;margin:0.6rem 0;
   animation:gentle-pulse 2.5s ease-in-out infinite;}
+.rk-tabs{display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:0.8rem;
+  border-bottom:1px solid #1e3250;padding-bottom:0.4rem;}
+.rk-tab{padding:0.35rem 0.7rem;border-radius:6px 6px 0 0;font-size:0.75rem;
+  color:#7a9ebc;text-decoration:none;transition:all 0.2s;border:1px solid transparent;
+  border-bottom:none;font-weight:500;}
+.rk-tab:hover{color:#d6e8f8;background:#1c2a42;}
+.rk-tab-active{color:#d6e8f8;background:#1c2a42;border-color:#1e3250;
+  border-bottom:2px solid #5dc9a5;font-weight:700;}
 </style>""", unsafe_allow_html=True)
 
     # ── Load data ─────────────────────────────────────────────────────────────
@@ -324,31 +332,46 @@ def render(*_args, **_kwargs):
                 _best_pos_val = f"{_pos_avg.max():.2f} fWAR/$M"
 
     # ── Build box HTML helper ─────────────────────────────────────────────────
-    def _box_html(box_id, label, team_name, val_str, logo_url="", img_html=""):
+    def _box_html(box_id, label, team_name, val_str, logo_url="", img_html="", team_abbr=""):
         _sel_cls = "rk-box-sel" if box_id == _sel_box else ""
-        _href = f"?page=rankings&rk_box={box_id}&rk_year={sel_year}"
+        _box_tab = _BOX_TAB.get(box_id, "efficiency")
+        _href = f"?page=rankings&rk_box={box_id}&rk_year={sel_year}&rk_tab={_box_tab}"
         _logo_tag = (f"<img src='{logo_url}' width='36' height='36' "
                      f"style='object-fit:contain;margin-bottom:4px;' "
                      f"onerror=\"this.style.display='none'\">") if logo_url else ""
         if img_html:
             _logo_tag = img_html
+        # Team name links to team analysis page if we have an abbreviation
+        _team_html = team_name
+        if team_abbr:
+            _team_html = (f"<a href='?page=team&sel_team={team_abbr}' target='_self' "
+                          f"style='color:#d6e8f8;text-decoration:none;' "
+                          f"onmouseover=\"this.style.textDecoration='underline'\" "
+                          f"onmouseout=\"this.style.textDecoration='none'\">{team_name}</a>")
         return (
             f"<a href='{_href}' target='_self' style='text-decoration:none;color:inherit;'>"
             f"<div class='rk-answer {_sel_cls}'>"
             f"{_logo_tag}"
             f"<div class='rk-q'>{label}</div>"
-            f"<div class='rk-team'>{team_name}</div>"
+            f"<div class='rk-team'>{_team_html}</div>"
             f"<div class='rk-val'>{val_str}</div>"
             f"</div></a>"
         )
 
     def _player_box_html(box_id, title, pname, pteam, pval, psub=""):
         _sel_cls = "rk-box-sel" if box_id == _sel_box else ""
-        _href = f"?page=rankings&rk_box={box_id}&rk_year={sel_year}"
+        _box_tab = _BOX_TAB.get(box_id, "efficiency")
+        _href = f"?page=rankings&rk_box={box_id}&rk_year={sel_year}&rk_tab={_box_tab}"
         mid = _mlbam.get(_fix_player_name(pname), "") if _mlbam else ""
-        _img = (f"<img src='{_headshot_url(mid, 120)}' width='60' height='60' loading='lazy' "
-                f"style='border-radius:50%;object-fit:cover;margin-bottom:4px;' "
-                f"onerror=\"this.style.display='none'\">") if mid else ""
+        # Headshot links to team analysis page for this player's team
+        _team_link = f"?page=team&sel_team={pteam}"
+        _img = (f"<a href='{_team_link}' target='_self' style='display:inline-block;'>"
+                f"<img src='{_headshot_url(mid, 120)}' width='60' height='60' loading='lazy' "
+                f"style='border-radius:50%;object-fit:cover;margin-bottom:4px;"
+                f"border:2px solid transparent;transition:border-color 0.2s;' "
+                f"onmouseover=\"this.style.borderColor='#5dc9a5'\" "
+                f"onmouseout=\"this.style.borderColor='transparent'\" "
+                f"onerror=\"this.style.display='none'\"></a>") if mid else ""
         _sub_html = f"<div style='font-size:0.62rem;color:#4a687e;'>{psub}</div>" if psub else ""
         return (
             f"<a href='{_href}' target='_self' style='text-decoration:none;color:inherit;'>"
@@ -363,22 +386,22 @@ def render(*_args, **_kwargs):
     # ── Row 1 + Row 2: Team boxes ─────────────────────────────────────────────
     _box_defs = [
         ("most_efficient", "MOST EFFICIENT", _full(_best_eff),
-         f"${_best_eff['dollar_gap_M']:.0f}M below the line", team_logo_url(_best_eff["Team"])),
+         f"${_best_eff['dollar_gap_M']:.0f}M below the line", team_logo_url(_best_eff["Team"]), _best_eff["Team"]),
         ("top_overperformer", "TOP OVERPERFORMER", _full(_overperf),
-         f"+{_overperf['wins_vs_pred']:.1f} wins vs forecast", team_logo_url(_overperf["Team"])),
+         f"+{_overperf['wins_vs_pred']:.1f} wins vs forecast", team_logo_url(_overperf["Team"]), _overperf["Team"]),
         ("best_dpw", "BEST $/fWAR", _full(_best_dpw),
-         f"${_best_dpw['DPW']:.1f}M per fWAR", team_logo_url(_best_dpw["Team"])),
+         f"${_best_dpw['DPW']:.1f}M per fWAR", team_logo_url(_best_dpw["Team"]), _best_dpw["Team"]),
         ("least_efficient", "LEAST EFFICIENT", _full(_worst_eff),
-         f"${_worst_eff['dollar_gap_M']:.0f}M above the line", team_logo_url(_worst_eff["Team"])),
+         f"${_worst_eff['dollar_gap_M']:.0f}M above the line", team_logo_url(_worst_eff["Team"]), _worst_eff["Team"]),
         ("top_fwar", "TOP fWAR", _full(_top_war),
-         f"{_top_war['team_WAR']:.1f} total fWAR", team_logo_url(_top_war["Team"])),
+         f"{_top_war['team_WAR']:.1f} total fWAR", team_logo_url(_top_war["Team"]), _top_war["Team"]),
         ("most_wins", "MOST WINS", _full(_top_wins),
-         f"{int(_top_wins['Wins'])} wins", team_logo_url(_top_wins["Team"])),
+         f"{int(_top_wins['Wins'])} wins", team_logo_url(_top_wins["Team"]), _top_wins["Team"]),
     ]
 
     _grid_html = "<div class='rk-grid'>"
-    for box_id, label, team_name, val_str, logo_url in _box_defs:
-        _grid_html += _box_html(box_id, label, team_name, val_str, logo_url=logo_url)
+    for box_id, label, team_name, val_str, logo_url, t_abbr in _box_defs:
+        _grid_html += _box_html(box_id, label, team_name, val_str, logo_url=logo_url, team_abbr=t_abbr)
     _grid_html += "</div>"
     st.markdown(_grid_html, unsafe_allow_html=True)
 
@@ -463,15 +486,34 @@ def render(*_args, **_kwargs):
         return fig
 
     # ── Tabs ─────────────────────────────────────────────────────────────────
-    _tab_default = _TAB_ORDER.index(_act_tab) if _act_tab in _TAB_ORDER else 0
-    rt1, rt2, rt3, rt4, rt5, rt6, rt7, rt8, rt9 = st.tabs([
-        "\U0001f3c6 Efficiency", "\u2b50 fWAR", "\U0001f4b0 Salary", "\U0001f4c8 Win Performance",
-        "\U0001f48e Contract Value", "\U0001f512 Stability",
-        "📊 Playoff Success", "💵 fWAR Cost", "🏟️ Position Value",
-    ])
+    # ── Custom tab bar ─────────────────────────────────────────────────────────
+    _TAB_NAMES = {
+        "efficiency": "\U0001f3c6 Efficiency",
+        "fwar": "\u2b50 fWAR",
+        "salary": "\U0001f4b0 Salary",
+        "winperf": "\U0001f4c8 Win Performance",
+        "contract_value": "\U0001f48e Contract Value",
+        "stability": "\U0001f512 Stability",
+        "playoff_success": "📊 Playoff Success",
+        "fwar_cost": "💵 fWAR Cost",
+        "position_value": "🏟️ Position Value",
+    }
+    _tab_html = "<div class='rk-tabs'>"
+    for _tk in _TAB_ORDER:
+        _cls = "rk-tab rk-tab-active" if _tk == _act_tab else "rk-tab"
+        _tab_html += (f"<a href='?page=rankings&rk_box={_sel_box}&rk_year={sel_year}&rk_tab={_tk}' "
+                      f"target='_self' class='{_cls}'>{_TAB_NAMES[_tk]}</a>")
+    _tab_html += "</div>"
+    st.markdown(_tab_html, unsafe_allow_html=True)
+
+    # Read tab from query params
+    _qp_tab = st.query_params.get("rk_tab")
+    if _qp_tab and _qp_tab in _TAB_ORDER:
+        _act_tab = _qp_tab
+        st.session_state["rk_active_tab"] = _qp_tab
 
     # ── Tab 1: Efficiency ─────────────────────────────────────────────────────
-    with rt1:
+    if _act_tab == "efficiency":
         st.markdown(
             "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;'>"
             "Dollar gap from the <b>Cost Effective Line</b> \u2014 how much more or less each team "
@@ -554,7 +596,7 @@ def render(*_args, **_kwargs):
             )
 
     # ── Tab 2: fWAR ───────────────────────────────────────────────────────────
-    with rt2:
+    if _act_tab == "fwar":
         st.markdown(
             "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;'>"
             "Total team WAR for the selected season across all pitchers and position players. "
@@ -772,7 +814,7 @@ def render(*_args, **_kwargs):
                 )
 
     # ── Tab 3: Salary ─────────────────────────────────────────────────────────
-    with rt3:
+    if _act_tab == "salary":
         st.markdown(
             "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;'>"
             "Team payroll for the selected season. Use $/WAR to compare how much each team "
@@ -895,7 +937,7 @@ def render(*_args, **_kwargs):
                 )
 
     # ── Tab 4: Win Performance ────────────────────────────────────────────────
-    with rt4:
+    if _act_tab == "winperf":
         st.markdown(
             "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;'>"
             "Actual wins minus the wins <b>predicted by payroll</b> from the league regression. "
@@ -943,7 +985,7 @@ def render(*_args, **_kwargs):
             )
 
     # ── Tab 5: Contract Value ─────────────────────────────────────────────────
-    with rt5:
+    if _act_tab == "contract_value":
         # Explainer
         st.markdown(
             "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;line-height:1.6;'>"
@@ -1044,7 +1086,7 @@ def render(*_args, **_kwargs):
             st.warning(f"Could not compute contract value data: {_cv_e}")
 
     # ── Tab 6: Stability ──────────────────────────────────────────────────────
-    with rt6:
+    if _act_tab == "stability":
         # Explainer
         st.markdown(
             "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;line-height:1.6;'>"
@@ -1188,7 +1230,7 @@ def render(*_args, **_kwargs):
             st.warning(f"Could not compute stability data: {_ws_e}")
 
     # ── Tab 7: Playoff Success ───────────────────────────────────────────────
-    with rt7:
+    if _act_tab == "playoff_success":
         st.markdown(
             "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;line-height:1.6;'>"
             "Do teams that spend efficiently actually win more in October? We compare playoff "
@@ -1299,7 +1341,7 @@ def render(*_args, **_kwargs):
             st.warning(f"Could not compute playoff success data: {_ps_e}")
 
     # ── Tab 8: fWAR Cost ─────────────────────────────────────────────────────
-    with rt8:
+    if _act_tab == "fwar_cost":
         st.markdown(
             "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;line-height:1.6;'>"
             "The market price of one win fluctuates each year. Here's what teams pay per fWAR "
@@ -1360,7 +1402,7 @@ def render(*_args, **_kwargs):
             st.warning(f"Could not compute fWAR cost data: {_fc_e}")
 
     # ── Tab 9: Position Value ────────────────────────────────────────────────
-    with rt9:
+    if _act_tab == "position_value":
         st.markdown(
             "<div style='font-size:0.82rem;color:#93b8d8;margin-bottom:0.6rem;line-height:1.6;'>"
             "Which positions give teams the most production per dollar? Position scarcity "
