@@ -58,6 +58,7 @@ UPLOAD_TARGETS: list[tuple[Path, str]] = [
     (_HERE / "data" / "2025mlbshared.csv",            "data/2025mlbshared.csv"),
     (_HERE / "data" / "razzball.csv",                 "data/razzball.csv"),
     (_HERE / "data" / "40man_rosters_2025.csv",      "data/40man_rosters_2025.csv"),
+    (_HERE / "data" / "team_payroll_totals_2021_2026.csv", "data/team_payroll_totals_2021_2026.csv"),
 
     # ── Pre-generated analysis outputs (sit at project root) ─────────────────
     (_HERE / "efficiency_detail.csv",                 "efficiency_detail.csv"),

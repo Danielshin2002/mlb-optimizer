@@ -152,51 +152,55 @@ def _arb_key(val) -> str | None:
 # ---------------------------------------------------------------------------
 
 def get_all_teams(data_dir: str) -> list[str]:
-    """Return sorted list of all teams present in the 2025 data file."""
-    path = os.path.join(data_dir, _YEAR_FILES[_CURRENT_SEASON])
+    """Return sorted list of all teams present in the combined data file."""
+    path = os.path.join(data_dir, "mlb_combined_2021_2025.csv")
+    if not os.path.exists(path):
+        # Fallback to old per-year file
+        path = os.path.join(data_dir, _YEAR_FILES[_CURRENT_SEASON])
     df = pd.read_csv(path, low_memory=False, usecols=["Team"])
     return sorted(df["Team"].dropna().unique().tolist())
 
 
 def get_team_payroll_history(data_dir: str) -> pd.DataFrame:
     """
-    Compute team payrolls for each available season by summing committed
-    dollar-amount salaries from each year's individual CSV.
+    Load team payroll history from the pre-built team_payroll_totals CSV.
+
+    Falls back to computing from the combined CSV if the totals file
+    is not available.
 
     Returns
     -------
     DataFrame with columns: Team, Year, payroll_M
     """
-    records = []
-    for year, fname in _YEAR_FILES.items():
-        path = os.path.join(data_dir, fname)
-        if not os.path.exists(path):
-            continue
-        df = _fix_player_col(pd.read_csv(path, low_memory=False))
-        df.columns = [c.strip() for c in df.columns]
-        year_col = str(year)
-        if year_col not in df.columns:
-            continue
-        df["_sal_M"] = df[year_col].apply(_parse_dollar)
-        # Deduplicate traded players (keep highest salary row per player)
-        df = (
-            df.sort_values("_sal_M", ascending=False, na_position="last", kind="mergesort")
-              .drop_duplicates(subset=["Player"], keep="first")
-              .reset_index(drop=True)
+    # Prefer the pre-built payroll totals CSV (has luxury_tax_payroll_M)
+    totals_path = os.path.join(data_dir, "team_payroll_totals_2021_2026.csv")
+    if os.path.exists(totals_path):
+        tp = pd.read_csv(totals_path)
+        tp.columns = [c.strip() for c in tp.columns]
+        # Use luxury_tax_payroll_M as payroll_M (most comparable to CBT)
+        col = "luxury_tax_payroll_M" if "luxury_tax_payroll_M" in tp.columns else "pre_tax_payroll_M"
+        result = tp[["team", "year", col]].rename(
+            columns={"team": "Team", "year": "Year", col: "payroll_M"}
         )
-        team_pay = (
-            df.dropna(subset=["_sal_M"])
-              .groupby("Team")["_sal_M"]
-              .sum()
-              .reset_index()
-              .rename(columns={"_sal_M": "payroll_M"})
-        )
-        team_pay["Year"] = year
-        records.append(team_pay)
+        return result
 
-    if not records:
-        return pd.DataFrame(columns=["Team", "Year", "payroll_M"])
-    return pd.concat(records, ignore_index=True)
+    # Fallback: compute from combined CSV
+    combined_path = os.path.join(data_dir, "mlb_combined_2021_2025.csv")
+    if os.path.exists(combined_path):
+        comb = pd.read_csv(combined_path, low_memory=False,
+                           usecols=["Team", "Year", "Salary_M"])
+        comb["Salary_M"] = pd.to_numeric(comb["Salary_M"], errors="coerce")
+        comb["Year"] = pd.to_numeric(comb["Year"], errors="coerce")
+        result = (
+            comb.dropna(subset=["Salary_M", "Team"])
+                .groupby(["Team", "Year"])["Salary_M"]
+                .sum()
+                .reset_index()
+                .rename(columns={"Salary_M": "payroll_M"})
+        )
+        return result
+
+    return pd.DataFrame(columns=["Team", "Year", "payroll_M"])
 
 
 def get_team_roster_status(
