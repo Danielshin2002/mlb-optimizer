@@ -65,9 +65,9 @@ def render(*_args, **_kwargs):
 .rk-hdr h2{margin:0;font-size:1.25rem;color:#d6e8f8;font-weight:700;}
 .rk-hdr .rk-sub{font-size:0.72rem;color:#7a9ebc;margin-top:0.15rem;}
 .rk-answer{background:#1c2a42;border:1px solid #1e3250;border-radius:10px;
-  padding:0.8rem 1rem;text-align:center;min-height:120px;
+  padding:0.8rem 1rem;text-align:center;height:160px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  transition:border-color 0.2s,box-shadow 0.2s;}
+  transition:border-color 0.2s,box-shadow 0.2s;box-sizing:border-box;}
 .rk-answer:hover{border-color:#2a4060;box-shadow:0 0 8px rgba(93,202,165,0.1);}
 .rk-answer .rk-q{font-size:0.72rem;color:#93b8d8;
   letter-spacing:0.05em;margin-bottom:0.2rem;font-weight:600;}
@@ -77,6 +77,8 @@ def render(*_args, **_kwargs):
 .rk-box-sel{border:2px solid #5dc9a5 !important;box-shadow:0 0 15px rgba(93,202,165,0.3),0 0 30px rgba(93,202,165,0.15) !important;}
 .rk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.7rem;margin-bottom:0.7rem;}
 .rk-grid a{text-decoration:none;color:inherit;}
+[data-testid="column"] a{text-decoration:none;color:inherit;display:block;}
+[data-testid="column"] .rk-answer{width:100%;}
 @keyframes gentle-pulse{0%,100%{opacity:0.4;}50%{opacity:1;}}
 .rk-hint{text-align:center;color:#4a687e;font-size:0.82rem;margin:0.6rem 0;
   animation:gentle-pulse 2.5s ease-in-out infinite;}
@@ -397,42 +399,71 @@ def render(*_args, **_kwargs):
          f"{int(_top_wins['Wins'])} wins", team_logo_url(_top_wins["Team"]), _top_wins["Team"]),
     ]
 
-    # ── All boxes in one grid ────────────────────────────────────────────────
-    _all_boxes = "<div class='rk-grid'>"
-    # Row 1-2: Team boxes
-    for box_id, label, team_name, val_str, logo_url, t_abbr in _box_defs:
-        _all_boxes += _box_html(box_id, label, team_name, val_str, logo_url=logo_url, team_abbr=t_abbr)
-    # Row 3: Player award boxes
-    if _p_top_war is not None:
-        _all_boxes += _player_box_html(
-            "p_top_fwar", f"#1 fWAR ({sel_year})", str(_p_top_war["Player"]),
-            str(_p_top_war["Team"]), f"{_p_top_war['WAR_Total']:.1f} fWAR")
-    if _p_best_val is not None:
-        _all_boxes += _player_box_html(
-            "p_contract_val", "TOP CONTRACT VALUE", str(_p_best_val["Player"]),
-            str(_p_best_val["Team"]), f"{_p_best_val['_wpm']:.2f} fWAR/$M",
-            f"{_p_best_val['WAR_Total']:.1f} fWAR \u00b7 ${_p_best_val['Salary_M']:.1f}M")
-    if _p_best_wsr is not None:
-        _all_boxes += _player_box_html(
-            "p_stability", "BEST fWAR STABILITY", str(_p_best_wsr["Player"]),
-            str(_p_best_wsr["Team"]), f"{_p_best_wsr['WSR']:.2f} WSR",
-            f"Avg {_p_best_wsr['_mean']:.1f} fWAR \u00b7 {int(_p_best_wsr['_n'])} seasons")
+    # ── Box grid using st.columns(3) per row ─────────────────────────────────
+    def _render_box(html):
+        st.markdown(html, unsafe_allow_html=True)
+
+    # Row 1
+    _r1c1, _r1c2, _r1c3 = st.columns(3)
+    with _r1c1:
+        _render_box(_box_html(*_box_defs[0][:4], logo_url=_box_defs[0][4], team_abbr=_box_defs[0][5]))
+    with _r1c2:
+        _render_box(_box_html(*_box_defs[1][:4], logo_url=_box_defs[1][4], team_abbr=_box_defs[1][5]))
+    with _r1c3:
+        _render_box(_box_html(*_box_defs[2][:4], logo_url=_box_defs[2][4], team_abbr=_box_defs[2][5]))
+
+    # Row 2
+    _r2c1, _r2c2, _r2c3 = st.columns(3)
+    with _r2c1:
+        _render_box(_box_html(*_box_defs[3][:4], logo_url=_box_defs[3][4], team_abbr=_box_defs[3][5]))
+    with _r2c2:
+        _render_box(_box_html(*_box_defs[4][:4], logo_url=_box_defs[4][4], team_abbr=_box_defs[4][5]))
+    with _r2c3:
+        _render_box(_box_html(*_box_defs[5][:4], logo_url=_box_defs[5][4], team_abbr=_box_defs[5][5]))
+
+    # Row 3: Player boxes
+    _r3c1, _r3c2, _r3c3 = st.columns(3)
+    with _r3c1:
+        if _p_top_war is not None:
+            _render_box(_player_box_html(
+                "p_top_fwar", f"#1 fWAR ({sel_year})", str(_p_top_war["Player"]),
+                str(_p_top_war["Team"]), f"{_p_top_war['WAR_Total']:.1f} fWAR"))
+    with _r3c2:
+        if _p_best_val is not None:
+            _render_box(_player_box_html(
+                "p_contract_val", "TOP CONTRACT VALUE", str(_p_best_val["Player"]),
+                str(_p_best_val["Team"]), f"{_p_best_val['_wpm']:.2f} fWAR/$M",
+                f"{_p_best_val['WAR_Total']:.1f} fWAR \u00b7 ${_p_best_val['Salary_M']:.1f}M"))
+    with _r3c3:
+        if _p_best_wsr is not None:
+            _render_box(_player_box_html(
+                "p_stability", "BEST fWAR STABILITY", str(_p_best_wsr["Player"]),
+                str(_p_best_wsr["Team"]), f"{_p_best_wsr['WSR']:.2f} WSR",
+                f"Avg {_p_best_wsr['_mean']:.1f} fWAR \u00b7 {int(_p_best_wsr['_n'])} seasons"))
+
     # Row 4: Analysis boxes
-    _all_boxes += _box_html("best_marginal", "BEST MARGINAL SPENDING", _best_marginal_name, _best_marginal_val)
-    _all_boxes += _box_html("fwar_wins_link", "STRONGEST fWAR-WINS LINK", "All Teams", _fwar_r2_str)
-    _all_boxes += _box_html("eff_playoffs", "EFFICIENCY \u2192 PLAYOFFS?",
-                             _eff_playoff_str, "Efficient vs Inefficient",
-                             img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>\U0001f4ca</div>")
+    _r4c1, _r4c2, _r4c3 = st.columns(3)
+    with _r4c1:
+        _render_box(_box_html("best_marginal", "BEST MARGINAL SPENDING", _best_marginal_name, _best_marginal_val))
+    with _r4c2:
+        _render_box(_box_html("fwar_wins_link", "STRONGEST fWAR-WINS LINK", "All Teams", _fwar_r2_str))
+    with _r4c3:
+        _render_box(_box_html("eff_playoffs", "EFFICIENCY \u2192 PLAYOFFS?",
+                               _eff_playoff_str, "Efficient vs Inefficient",
+                               img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>\U0001f4ca</div>"))
+
     # Row 5: Insight boxes
-    _all_boxes += _box_html("fwar_cost", "HOW MUCH DOES 1 fWAR COST?",
-                             _avg_dpw_str, "",
-                             img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>\U0001f4b5</div>")
-    _all_boxes += _box_html("best_position", "MOST EFFICIENT POSITION",
-                             _best_pos_val, f"Position: {_best_pos_name}",
-                             img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>\U0001f3df\ufe0f</div>")
-    _all_boxes += "<div></div>"
-    _all_boxes += "</div>"
-    st.markdown(_all_boxes, unsafe_allow_html=True)
+    _r5c1, _r5c2, _r5c3 = st.columns(3)
+    with _r5c1:
+        _render_box(_box_html("fwar_cost", "HOW MUCH DOES 1 fWAR COST?",
+                               _avg_dpw_str, "",
+                               img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>\U0001f4b5</div>"))
+    with _r5c2:
+        _render_box(_box_html("best_position", "MOST EFFICIENT POSITION",
+                               _best_pos_val, f"Position: {_best_pos_name}",
+                               img_html="<div style='font-size:1.3rem;margin-bottom:4px;'>\U0001f3df\ufe0f</div>"))
+    with _r5c3:
+        pass
 
     # Animated hint (disappears after first click)
     if not st.session_state.get("rk_box_clicked"):
