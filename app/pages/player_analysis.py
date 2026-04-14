@@ -1192,7 +1192,7 @@ padding:9px 16px;margin-top:6px;display:flex;gap:20px;align-items:center;flex-wr
                                          key="ef_pa_ptype")
 
             # Build pre-arb subset from the full raw dataset (all years, ignoring year filter)
-            _pa_raw = raw[raw["Stage_Clean"] == "Pre-Arbitration"].copy()
+            _pa_raw = raw[raw["Stage_Clean"] == "Pre-Arb"].copy()
             if _pa_ptype != "All":
                 _pa_raw = _pa_raw[_pa_raw["Player_Type"] == _pa_ptype]
             if _league_sel != "Both Leagues":
